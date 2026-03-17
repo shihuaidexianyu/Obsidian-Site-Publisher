@@ -9,7 +9,7 @@
     "lint": "eslint . --ext .ts --max-warnings=0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm lint && pnpm test && pnpm build"
+    "check": "corepack pnpm lint && corepack pnpm test && corepack pnpm build"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

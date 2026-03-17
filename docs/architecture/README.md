@@ -21,3 +21,9 @@ The repository is organized around a strict orchestration boundary:
 - Interfaces and workspace structure are in place.
 - Diagnostics has a first-pass implementation for duplicate slugs, duplicate permalinks, and unsupported-object reporting.
 - Parser, Quartz build, and deploy adapters are scaffolded and intentionally minimal.
+
+## Validation Corpus
+
+- Use `fixtures/` for deterministic unit and regression tests.
+- Use `test_vault/hw` as a real-world smoke-test vault when validating parser and diagnostics behavior.
+- Real-vault checks should confirm that Obsidian metadata directories such as `.obsidian/` and deleted-content folders such as `.trash/` stay out of the public content graph.

@@ -1,9 +1,10 @@
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
 import type { AssetRef, PublisherConfig, UnsupportedObjectRecord, VaultManifest } from "@osp/shared";
 
 import type { ScanInput, ScanResult, VaultParser } from "./contracts";
+import { parseFrontmatterFields } from "./frontmatter";
 
 export class FileSystemVaultParser implements VaultParser {
   public async scanVault(input: ScanInput): Promise<ScanResult> {
@@ -57,7 +58,7 @@ async function scanDirectory(
     }
 
     if (isMarkdownFile(relativePath)) {
-      scanState.notes.push(createNoteRecord(relativePath));
+      scanState.notes.push(await createNoteRecord(absolutePath, relativePath));
       continue;
     }
 
@@ -84,23 +85,38 @@ function createScanState(config: PublisherConfig): ScanState {
   };
 }
 
-function createNoteRecord(relativePath: string): VaultManifest["notes"][number] {
+async function createNoteRecord(
+  absolutePath: string,
+  relativePath: string
+): Promise<VaultManifest["notes"][number]> {
+  const markdownSource = await readFile(absolutePath, "utf8");
   const fileName = path.posix.basename(relativePath, ".md");
+  const frontmatterFields = parseFrontmatterFields(markdownSource);
 
-  return {
+  const noteRecord: VaultManifest["notes"][number] = {
     id: relativePath,
     path: relativePath,
     title: fileName,
     slug: slugify(fileName),
-    aliases: [],
+    aliases: frontmatterFields.aliases,
     headings: [],
     blockIds: [],
-    properties: {},
+    properties: frontmatterFields.properties,
     links: [],
     embeds: [],
     assets: [],
-    publish: false
+    publish: frontmatterFields.publish
   };
+
+  if (frontmatterFields.permalink !== undefined) {
+    noteRecord.permalink = frontmatterFields.permalink;
+  }
+
+  if (frontmatterFields.description !== undefined) {
+    noteRecord.description = frontmatterFields.description;
+  }
+
+  return noteRecord;
 }
 
 function createUnsupportedObjectRecord(relativePath: string): UnsupportedObjectRecord {

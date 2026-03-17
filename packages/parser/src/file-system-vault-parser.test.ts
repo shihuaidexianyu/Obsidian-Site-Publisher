@@ -35,6 +35,20 @@ describe("FileSystemVaultParser", () => {
 
     expect(VaultManifestSchema.parse(propertiesResult.manifest)).toBeTruthy();
     expect(propertiesResult.manifest.notes.map((note) => note.path)).toEqual(["Publishable.md"]);
+    expect(propertiesResult.manifest.notes[0]).toMatchObject({
+      path: "Publishable.md",
+      publish: true,
+      permalink: "/publishable/",
+      description: "Properties fixture",
+      aliases: ["Published Fixture", "Alias Example"],
+      properties: {
+        publish: true,
+        permalink: "/publishable/",
+        description: "Properties fixture",
+        aliases: ["Published Fixture", "Alias Example"],
+        image: "./cover.png"
+      }
+    });
     expect(propertiesResult.manifest.assetFiles).toEqual([
       {
         path: "cover.png",
@@ -83,6 +97,28 @@ describe("FileSystemVaultParser", () => {
       }
     ]);
     expect(result.manifest.unsupportedObjects).toEqual([]);
+  });
+
+  it("only treats a leading yaml block as frontmatter", async () => {
+    const vaultRoot = await createTempVault();
+
+    await writeFile(
+      path.join(vaultRoot, "BodyDivider.md"),
+      "# Heading\n\n---\n\nThis is a thematic break, not frontmatter.\n",
+      "utf8"
+    );
+
+    const result = await new FileSystemVaultParser().scanVault({
+      vaultRoot,
+      config: createConfig(vaultRoot)
+    });
+
+    expect(result.manifest.notes[0]).toMatchObject({
+      path: "BodyDivider.md",
+      publish: false,
+      aliases: [],
+      properties: {}
+    });
   });
 });
 

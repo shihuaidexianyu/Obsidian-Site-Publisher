@@ -35,6 +35,7 @@ These rules are designed to keep vibe coding productive without letting the repo
 - New config values include defaults and schema coverage.
 - New persisted outputs include schema coverage.
 - Changes that touch behavior should include fixture or unit coverage.
+- Parser and diagnostics changes should also be spot-checked against `test_vault/hw` when possible, because it acts as the repository's real-world smoke-test vault.
 
 ## Notes For AI Contributors
 

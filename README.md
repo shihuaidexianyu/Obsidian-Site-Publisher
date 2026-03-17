@@ -26,3 +26,8 @@ The main collaboration constraints live in:
 
 - [docs/prompts/engineering-rules.md](/c:/Users/exqin/Desktop/Obsidian%20Site%20Publisher/docs/prompts/engineering-rules.md)
 - [docs/prompts/task-template.md](/c:/Users/exqin/Desktop/Obsidian%20Site%20Publisher/docs/prompts/task-template.md)
+
+## Testing Data
+
+- `fixtures/` contains small deterministic regression vaults.
+- `test_vault/hw` can be used as a real-world smoke-test vault while developing parser and diagnostics behavior.
