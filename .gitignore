@@ -6,3 +6,5 @@ dist/
 .osp/
 .DS_Store
 coverage/
+
+test_valut

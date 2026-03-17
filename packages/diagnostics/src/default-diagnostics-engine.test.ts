@@ -53,6 +53,7 @@ describe("DefaultDiagnosticsEngine", () => {
           publish: true
         }
       ],
+      assetFiles: [],
       unsupportedObjects: [
         {
           kind: "canvas",

@@ -75,6 +75,7 @@ export type VaultManifest = {
   generatedAt: string;
   vaultRoot: string;
   notes: NoteRecord[];
+  assetFiles: AssetRef[];
   unsupportedObjects: UnsupportedObjectRecord[];
 };
 

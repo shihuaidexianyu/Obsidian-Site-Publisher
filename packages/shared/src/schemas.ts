@@ -65,6 +65,7 @@ export const VaultManifestSchema = z.object({
   generatedAt: z.string(),
   vaultRoot: z.string(),
   notes: z.array(NoteRecordSchema),
+  assetFiles: z.array(AssetRefSchema),
   unsupportedObjects: z.array(UnsupportedObjectRecordSchema)
 });
 
