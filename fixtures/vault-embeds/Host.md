@@ -1,3 +1,4 @@
 # Host
 
 ![[Embedded]]
+![[diagram.png]]

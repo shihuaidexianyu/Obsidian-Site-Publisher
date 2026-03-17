@@ -5,6 +5,8 @@ import type { AssetRef, PublisherConfig, UnsupportedObjectRecord, VaultManifest 
 
 import type { ScanInput, ScanResult, VaultParser } from "./contracts";
 import { parseFrontmatterFields } from "./frontmatter";
+import { analyzeMarkdownContent } from "./markdown-analysis";
+import { slugify } from "./slug";
 
 export class FileSystemVaultParser implements VaultParser {
   public async scanVault(input: ScanInput): Promise<ScanResult> {
@@ -92,6 +94,7 @@ async function createNoteRecord(
   const markdownSource = await readFile(absolutePath, "utf8");
   const fileName = path.posix.basename(relativePath, ".md");
   const frontmatterFields = parseFrontmatterFields(markdownSource);
+  const markdownAnalysis = analyzeMarkdownContent(markdownSource);
 
   const noteRecord: VaultManifest["notes"][number] = {
     id: relativePath,
@@ -99,12 +102,12 @@ async function createNoteRecord(
     title: fileName,
     slug: slugify(fileName),
     aliases: frontmatterFields.aliases,
-    headings: [],
-    blockIds: [],
+    headings: markdownAnalysis.headings,
+    blockIds: markdownAnalysis.blockIds,
     properties: frontmatterFields.properties,
-    links: [],
-    embeds: [],
-    assets: [],
+    links: markdownAnalysis.links,
+    embeds: markdownAnalysis.embeds,
+    assets: markdownAnalysis.assets,
     publish: frontmatterFields.publish
   };
 
@@ -192,14 +195,4 @@ function inferAssetKind(relativePath: string): AssetRef["kind"] {
   }
 
   return "other";
-}
-
-function slugify(fileName: string): string {
-  const normalized = fileName
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return normalized === "" ? "note" : normalized;
 }

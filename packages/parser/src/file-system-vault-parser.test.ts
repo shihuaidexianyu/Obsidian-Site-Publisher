@@ -67,6 +67,79 @@ describe("FileSystemVaultParser", () => {
     ]);
   });
 
+  it("extracts headings, block ids, links, embeds, and note assets from fixtures", async () => {
+    const parser = new FileSystemVaultParser();
+    const linksVaultRoot = path.resolve("fixtures/vault-links");
+    const headingVaultRoot = path.resolve("fixtures/vault-heading-block-links");
+    const embedsVaultRoot = path.resolve("fixtures/vault-embeds");
+
+    const linksResult = await parser.scanVault({
+      vaultRoot: linksVaultRoot,
+      config: createConfig(linksVaultRoot)
+    });
+    const headingResult = await parser.scanVault({
+      vaultRoot: headingVaultRoot,
+      config: createConfig(headingVaultRoot)
+    });
+    const embedsResult = await parser.scanVault({
+      vaultRoot: embedsVaultRoot,
+      config: createConfig(embedsVaultRoot)
+    });
+
+    expect(linksResult.manifest.notes.find((note) => note.path === "Home.md")).toMatchObject({
+      links: [
+        {
+          kind: "wikilink",
+          target: "Second Note"
+        },
+        {
+          kind: "markdown",
+          target: "Second Note.md"
+        }
+      ]
+    });
+    expect(headingResult.manifest.notes.find((note) => note.path === "Source.md")).toMatchObject({
+      headings: [
+        {
+          text: "Source Heading",
+          slug: "source-heading",
+          depth: 1
+        }
+      ],
+      blockIds: ["source-block"]
+    });
+    expect(headingResult.manifest.notes.find((note) => note.path === "Target.md")).toMatchObject({
+      links: [
+        {
+          kind: "heading",
+          target: "Source#Source Heading"
+        },
+        {
+          kind: "block",
+          target: "Source#^source-block"
+        }
+      ]
+    });
+    expect(embedsResult.manifest.notes.find((note) => note.path === "Host.md")).toMatchObject({
+      embeds: [
+        {
+          kind: "note",
+          target: "Embedded"
+        },
+        {
+          kind: "asset",
+          target: "diagram.png"
+        }
+      ],
+      assets: [
+        {
+          path: "diagram.png",
+          kind: "image"
+        }
+      ]
+    });
+  });
+
   it("ignores .git, .obsidian, .trash, node_modules, and outputDir content", async () => {
     const vaultRoot = await createTempVault();
 

@@ -43,6 +43,10 @@ function extractFrontmatterBlock(markdownSource: string): string | undefined {
   return match?.[1];
 }
 
+export function stripLeadingFrontmatter(markdownSource: string): string {
+  return markdownSource.replace(/^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)(?:\r?\n|$)/, "");
+}
+
 function parseFrontmatterObject(frontmatterBlock: string): Record<string, unknown> {
   try {
     const document = parseDocument(frontmatterBlock);
