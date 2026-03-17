@@ -111,7 +111,8 @@ function createUnsupportedObjectRecord(relativePath: string): UnsupportedObjectR
 }
 
 function createIgnoredRelativePrefixes(config: PublisherConfig): string[] {
-  const prefixes = [".obsidian", "node_modules"];
+  // These folders are vault-local metadata or deleted content, not publishable material.
+  const prefixes = [".git", ".obsidian", ".trash", "node_modules"];
   const relativeOutputPath = toOptionalRelativeVaultPath(config.vaultRoot, config.outputDir);
 
   if (relativeOutputPath !== undefined) {

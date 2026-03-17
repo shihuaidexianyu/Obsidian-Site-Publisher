@@ -53,15 +53,19 @@ describe("FileSystemVaultParser", () => {
     ]);
   });
 
-  it("ignores .obsidian, node_modules, and outputDir content", async () => {
+  it("ignores .git, .obsidian, .trash, node_modules, and outputDir content", async () => {
     const vaultRoot = await createTempVault();
 
+    await mkdir(path.join(vaultRoot, ".git"), { recursive: true });
     await mkdir(path.join(vaultRoot, ".obsidian"), { recursive: true });
+    await mkdir(path.join(vaultRoot, ".trash"), { recursive: true });
     await mkdir(path.join(vaultRoot, "node_modules", "pkg"), { recursive: true });
     await mkdir(path.join(vaultRoot, ".osp", "dist"), { recursive: true });
     await mkdir(path.join(vaultRoot, "assets"), { recursive: true });
     await writeFile(path.join(vaultRoot, "Visible.md"), "# Visible", "utf8");
+    await writeFile(path.join(vaultRoot, ".git", "HEAD"), "ref: refs/heads/main", "utf8");
     await writeFile(path.join(vaultRoot, ".obsidian", "Hidden.md"), "# Hidden", "utf8");
+    await writeFile(path.join(vaultRoot, ".trash", "Deleted.md"), "# Deleted", "utf8");
     await writeFile(path.join(vaultRoot, "node_modules", "pkg", "Ignored.md"), "# Ignored", "utf8");
     await writeFile(path.join(vaultRoot, ".osp", "dist", "Generated.md"), "# Generated", "utf8");
     await writeFile(path.join(vaultRoot, "assets", "logo.png"), "not-a-real-png", "utf8");
