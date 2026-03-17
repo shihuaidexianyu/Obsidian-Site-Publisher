@@ -1,0 +1,16 @@
+{
+  "name": "@osp/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@osp/builder-adapter-quartz": "workspace:*",
+    "@osp/deploy-adapters": "workspace:*",
+    "@osp/diagnostics": "workspace:*",
+    "@osp/parser": "workspace:*",
+    "@osp/shared": "workspace:*",
+    "@osp/staging": "workspace:*"
+  }
+}

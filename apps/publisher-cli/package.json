@@ -1,0 +1,15 @@
+{
+  "name": "@osp/publisher-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "publisher-cli": "./dist/main.js"
+  },
+  "dependencies": {
+    "@osp/core": "workspace:*",
+    "@osp/shared": "workspace:*"
+  }
+}

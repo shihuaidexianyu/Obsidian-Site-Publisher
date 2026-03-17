@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-site-publisher",
+  "name": "Obsidian Site Publisher",
+  "version": "0.1.0",
+  "minAppVersion": "1.6.0",
+  "description": "Git-first static publishing orchestrator scaffold for Obsidian.",
+  "author": "OpenAI Codex",
+  "isDesktopOnly": true
+}

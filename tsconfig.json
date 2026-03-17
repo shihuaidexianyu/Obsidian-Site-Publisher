@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/parser" },
+    { "path": "./packages/diagnostics" },
+    { "path": "./packages/staging" },
+    { "path": "./packages/builder-adapter-quartz" },
+    { "path": "./packages/deploy-adapters" },
+    { "path": "./packages/core" },
+    { "path": "./apps/obsidian-plugin" },
+    { "path": "./apps/publisher-cli" }
+  ]
+}

@@ -1,0 +1,75 @@
+import type { BuildIssue, PublisherConfig, UnsupportedObjectRecord, VaultManifest } from "@osp/shared";
+
+import type { DiagnosticsEngine } from "./contracts";
+
+export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
+  public analyze(manifest: VaultManifest, _config: PublisherConfig): BuildIssue[] {
+    return [
+      ...analyzeDuplicateSlugs(manifest),
+      ...analyzeDuplicatePermalinks(manifest),
+      ...analyzeUnsupportedObjects(manifest.unsupportedObjects)
+    ];
+  }
+}
+
+export function analyzeDuplicateSlugs(manifest: VaultManifest): BuildIssue[] {
+  const seen = new Map<string, string>();
+  const issues: BuildIssue[] = [];
+
+  for (const note of manifest.notes) {
+    const previousPath = seen.get(note.slug);
+
+    if (previousPath !== undefined) {
+      issues.push({
+        code: "DUPLICATE_SLUG",
+        severity: "error",
+        file: note.path,
+        message: `Slug "${note.slug}" is already used by ${previousPath}.`,
+        suggestion: "Add a custom permalink or rename one of the notes."
+      });
+      continue;
+    }
+
+    seen.set(note.slug, note.path);
+  }
+
+  return issues;
+}
+
+export function analyzeDuplicatePermalinks(manifest: VaultManifest): BuildIssue[] {
+  const seen = new Map<string, string>();
+  const issues: BuildIssue[] = [];
+
+  for (const note of manifest.notes) {
+    if (note.permalink === undefined) {
+      continue;
+    }
+
+    const previousPath = seen.get(note.permalink);
+
+    if (previousPath !== undefined) {
+      issues.push({
+        code: "DUPLICATE_PERMALINK",
+        severity: "error",
+        file: note.path,
+        message: `Permalink "${note.permalink}" is already used by ${previousPath}.`,
+        suggestion: "Keep permalinks unique across published notes."
+      });
+      continue;
+    }
+
+    seen.set(note.permalink, note.path);
+  }
+
+  return issues;
+}
+
+function analyzeUnsupportedObjects(objects: UnsupportedObjectRecord[]): BuildIssue[] {
+  return objects.map((object) => ({
+    code: object.kind === "canvas" ? "UNSUPPORTED_CANVAS" : "UNSUPPORTED_BASE",
+    severity: "info",
+    file: object.path,
+    message: `Detected official ${object.kind} file "${object.path}", but v1 only reports it and does not render it.`,
+    suggestion: "Keep a link to the source file or exclude it from the public slice."
+  }));
+}

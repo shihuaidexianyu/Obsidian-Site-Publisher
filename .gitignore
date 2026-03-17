@@ -1,0 +1,8 @@
+todo.md
+node_modules/
+dist/
+.turbo/
+.vitest/
+.osp/
+.DS_Store
+coverage/
