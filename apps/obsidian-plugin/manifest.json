@@ -1,9 +1,9 @@
 {
   "id": "obsidian-site-publisher",
-  "name": "Obsidian Site Publisher",
+  "name": "站点发布",
   "version": "0.1.0",
   "minAppVersion": "1.6.0",
-  "description": "Git-first static publishing orchestrator scaffold for Obsidian.",
+  "description": "面向 Obsidian 的 Git 优先静态站点发布工具。",
   "author": "OpenAI Codex",
   "isDesktopOnly": true
 }

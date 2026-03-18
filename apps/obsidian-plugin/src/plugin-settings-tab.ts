@@ -34,7 +34,7 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
       .setName("发布模式")
       .setDesc("选择通过 frontmatter 或文件夹来决定哪些笔记会被发布。")
       .addDropdown((dropdown) => {
-        dropdown.addOption("frontmatter", "Frontmatter 模式");
+        dropdown.addOption("frontmatter", "属性模式");
         dropdown.addOption("folder", "文件夹模式");
         dropdown.setValue(config.publishMode);
         dropdown.onChange(async (value) => {
@@ -54,7 +54,7 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
       "发布根目录",
       "文件夹模式下可选的发布根目录。",
       config.publishRoot,
-      "Public",
+      "公开内容",
       async (value) => {
         await this.plugin.updateSettingsWith((currentSettings) => ({
           ...currentSettings,
@@ -106,7 +106,7 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
         "导出目标目录",
         "本地导出模式下可选的目标目录。",
         config.deployOutputDir,
-        "published-site",
+        "已发布站点",
         async (value) => {
           await this.plugin.updateSettingsWith((currentSettings) => ({
             ...currentSettings,
@@ -135,7 +135,7 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
         "发布分支",
         "留空时使用默认分支。",
         config.deployBranch,
-        config.deployTarget === "github-pages" ? "main or gh-pages" : "gh-pages",
+        config.deployTarget === "github-pages" ? "main 或 gh-pages" : "gh-pages",
         async (value) => {
           await this.plugin.updateSettingsWith((currentSettings) => ({
             ...currentSettings,
