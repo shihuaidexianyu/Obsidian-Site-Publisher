@@ -1,4 +1,4 @@
-import { fork, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -287,14 +287,13 @@ function createCliChild(
   }
 ): CliChildProcess {
   if (/\.(c|m)?js$/iu.test(cliCommand)) {
-    return fork(cliCommand, args, {
+    return spawn(resolveNodeCommand(), [cliCommand, ...args], {
       cwd: options.cwd,
       env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: "1"
+        ...process.env
       },
-      execPath: process.execPath,
-      silent: true
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
     });
   }
 
@@ -317,6 +316,10 @@ function createCliChild(
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true
   });
+}
+
+function resolveNodeCommand(): string {
+  return process.env.OSP_NODE_BINARY ?? process.env.NODE ?? "node";
 }
 
 function buildCommandLine(command: string, args: string[]): string {

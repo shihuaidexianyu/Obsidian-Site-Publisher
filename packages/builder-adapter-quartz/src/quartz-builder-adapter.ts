@@ -229,7 +229,7 @@ function resolveNodeRequire(): NodeJS.Require {
     return nativeRequire;
   }
 
-  return createRequire(path.join(process.cwd(), "package.json"));
+  return createRequire(import.meta.url);
 }
 
 function readNativeRequire(): NodeJS.Require | undefined {
