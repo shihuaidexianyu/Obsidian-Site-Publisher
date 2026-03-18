@@ -47,6 +47,7 @@ await runCommand(
 await sanitizeCliDeployDirectory(cliDeployRoot);
 await mkdir(cliPackageRoot, { recursive: true });
 await copyReleaseEntry(coreDeployRoot, cliPackageRoot, "node_modules");
+await materializeWorkspacePackage(path.join(workspaceRoot, "packages", "core"), path.join(cliPackageRoot, "node_modules", "@osp", "core"));
 await copyReleaseEntry(cliDeployRoot, cliPackageRoot, "dist");
 await copyReleaseEntry(cliDeployRoot, cliPackageRoot, "package.json");
 await copyReleaseEntry(cliDeployRoot, cliPackageRoot, "tsconfig.json");
@@ -142,6 +143,13 @@ async function sanitizeCliDeployDirectory(cliRoot) {
     ),
     "utf8"
   );
+}
+
+async function materializeWorkspacePackage(sourcePackageRoot, targetPackageRoot) {
+  await rm(targetPackageRoot, { recursive: true, force: true });
+  await mkdir(targetPackageRoot, { recursive: true });
+  await copyReleaseEntry(sourcePackageRoot, targetPackageRoot, "dist");
+  await copyReleaseEntry(sourcePackageRoot, targetPackageRoot, "package.json");
 }
 
 async function copyReleaseEntry(sourceRoot, targetRoot, entryName) {
