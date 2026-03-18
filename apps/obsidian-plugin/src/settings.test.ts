@@ -12,6 +12,9 @@ describe("plugin settings", () => {
       config: {
         publishMode: "folder",
         publishRoot: "Public",
+        deployTarget: "github-pages",
+        deployRepositoryUrl: "https://github.com/example/example.github.io",
+        deployBranch: "main",
         strictMode: true,
         vaultRoot: "/other"
       }
@@ -21,6 +24,9 @@ describe("plugin settings", () => {
       vaultRoot: "/vault",
       publishMode: "folder",
       publishRoot: "Public",
+      deployTarget: "github-pages",
+      deployRepositoryUrl: "https://github.com/example/example.github.io",
+      deployBranch: "main",
       strictMode: true
     });
   });
@@ -70,6 +76,30 @@ describe("plugin settings", () => {
     await savePluginSettings(store, settings);
 
     expect(store.saveData).toHaveBeenCalledWith(settings);
+  });
+
+  it("keeps deploy-related optional fields when loading valid stored settings", async () => {
+    const shell = new PublisherPluginShell(() => createRuntime());
+    const store = {
+      loadData: vi.fn(async () => ({
+        config: {
+          deployTarget: "git-branch",
+          deployRepositoryUrl: "https://github.com/example/site.git",
+          deployBranch: "gh-pages",
+          deployCommitMessage: "Publish docs"
+        }
+      })),
+      saveData: vi.fn(async () => {})
+    };
+
+    const settings = await loadPluginSettings(store, shell, "/vault");
+
+    expect(settings.config).toMatchObject({
+      deployTarget: "git-branch",
+      deployRepositoryUrl: "https://github.com/example/site.git",
+      deployBranch: "gh-pages",
+      deployCommitMessage: "Publish docs"
+    });
   });
 });
 

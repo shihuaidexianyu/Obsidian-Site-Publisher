@@ -12,6 +12,13 @@ export * from "./plugin-view-model.js";
 export * from "./plugin-views.js";
 export * from "./settings.js";
 
+const deployTargetOptions = [
+  { value: "none", label: "None" },
+  { value: "local-export", label: "Local export" },
+  { value: "git-branch", label: "Git branch" },
+  { value: "github-pages", label: "GitHub Pages" }
+] as const;
+
 export default class ObsidianSitePublisherPlugin extends Plugin {
   private readonly shell = new PublisherPluginShell();
   private settings = this.shell.createInitialConfig("");
@@ -171,6 +178,74 @@ class PublisherPluginSettingTab extends PluginSettingTab {
         });
       });
 
+    new Setting(containerEl)
+      .setName("Deploy target")
+      .setDesc("Choose where the Publish command should deploy the built site.")
+      .addDropdown((dropdown) => {
+        for (const option of deployTargetOptions) {
+          dropdown.addOption(option.value, option.label);
+        }
+
+        dropdown.setValue(config.deployTarget);
+        dropdown.onChange(async (value) => {
+          await this.plugin.updateConfigWith((currentConfig) => ({
+            ...currentConfig,
+            deployTarget: normalizeDeployTarget(value)
+          }));
+          this.display();
+        });
+      });
+
+    if (config.deployTarget === "local-export") {
+      addOptionalTextSetting(
+        containerEl,
+        "Deploy output directory",
+        "Optional target directory used by local export deploys.",
+        config.deployOutputDir,
+        "published-site",
+        async (value) => {
+          await this.plugin.updateConfigWith((currentConfig) => updateOptionalConfigValue(currentConfig, "deployOutputDir", value));
+        }
+      );
+    }
+
+    if (config.deployTarget === "git-branch" || config.deployTarget === "github-pages") {
+      addOptionalTextSetting(
+        containerEl,
+        "Deploy repository URL",
+        "Optional remote repository URL to publish into, for example a GitHub Pages repository.",
+        config.deployRepositoryUrl,
+        "https://github.com/owner/repo",
+        async (value) => {
+          await this.plugin.updateConfigWith((currentConfig) =>
+            updateOptionalConfigValue(currentConfig, "deployRepositoryUrl", value)
+          );
+        }
+      );
+      addOptionalTextSetting(
+        containerEl,
+        "Deploy branch",
+        "Optional branch override. Leave empty to use the target default.",
+        config.deployBranch,
+        config.deployTarget === "github-pages" ? "main or gh-pages" : "gh-pages",
+        async (value) => {
+          await this.plugin.updateConfigWith((currentConfig) => updateOptionalConfigValue(currentConfig, "deployBranch", value));
+        }
+      );
+      addOptionalTextSetting(
+        containerEl,
+        "Deploy commit message",
+        "Optional commit message used for git-backed deploys.",
+        config.deployCommitMessage,
+        "Deploy static site",
+        async (value) => {
+          await this.plugin.updateConfigWith((currentConfig) =>
+            updateOptionalConfigValue(currentConfig, "deployCommitMessage", value)
+          );
+        }
+      );
+    }
+
     addToggleSetting(containerEl, "Strict mode", "Block preview and build on warnings too.", config.strictMode, async (value) => {
       await this.plugin.updateConfigWith((currentConfig) => ({
         ...currentConfig,
@@ -214,6 +289,46 @@ function addToggleSetting(
         await onChange(nextValue);
       });
     });
+}
+
+function addOptionalTextSetting(
+  containerEl: HTMLElement,
+  name: string,
+  description: string,
+  value: string | undefined,
+  placeholder: string,
+  onChange: (value: string) => Promise<void>
+): void {
+  new Setting(containerEl)
+    .setName(name)
+    .setDesc(description)
+    .addText((text) => {
+      text.setPlaceholder(placeholder);
+      text.setValue(value ?? "");
+      text.onChange(async (nextValue) => {
+        await onChange(nextValue);
+      });
+    });
+}
+
+function normalizeDeployTarget(value: string): typeof deployTargetOptions[number]["value"] {
+  return deployTargetOptions.some((option) => option.value === value) ? value as typeof deployTargetOptions[number]["value"] : "none";
+}
+
+function updateOptionalConfigValue<TKey extends "deployOutputDir" | "deployRepositoryUrl" | "deployBranch" | "deployCommitMessage">(
+  currentConfig: ObsidianSitePublisherPlugin["getConfig"] extends () => infer TConfig ? TConfig : never,
+  key: TKey,
+  value: string
+): ObsidianSitePublisherPlugin["getConfig"] extends () => infer TConfig ? TConfig : never {
+  const nextConfig = { ...currentConfig };
+
+  if (value.trim() === "") {
+    delete nextConfig[key];
+  } else {
+    nextConfig[key] = value.trim();
+  }
+
+  return nextConfig;
 }
 
 function resolveVaultRoot(plugin: Plugin): string {
