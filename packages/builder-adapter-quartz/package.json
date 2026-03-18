@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "dependencies": {
+    "@jackyzha0/quartz": "github:jackyzha0/quartz#v4",
     "@osp/shared": "workspace:*"
   }
 }

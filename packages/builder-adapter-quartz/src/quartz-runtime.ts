@@ -1,0 +1,220 @@
+import { cp, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+import type { PreparedWorkspace, PublisherConfig } from "@osp/shared";
+
+const runtimeFiles = ["globals.d.ts", "index.d.ts", "package.json", "tsconfig.json"] as const;
+
+export async function ensureQuartzWorkspaceRuntime(
+  workspace: PreparedWorkspace,
+  config: PublisherConfig,
+  quartzPackageRoot: string
+): Promise<void> {
+  await mkdir(workspace.rootDir, { recursive: true });
+  await cp(path.join(quartzPackageRoot, "quartz"), path.join(workspace.rootDir, "quartz"), {
+    force: true,
+    recursive: true
+  });
+
+  for (const runtimeFile of runtimeFiles) {
+    await cp(path.join(quartzPackageRoot, runtimeFile), path.join(workspace.rootDir, runtimeFile), {
+      force: true
+    });
+  }
+
+  await ensureNodeModulesLink(workspace.rootDir, path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules"));
+  await writeFile(path.join(workspace.rootDir, "quartz.config.ts"), renderQuartzConfig(config), "utf8");
+  await writeFile(path.join(workspace.rootDir, "quartz.layout.ts"), renderQuartzLayout(config), "utf8");
+}
+
+async function ensureNodeModulesLink(workspaceRoot: string, sourceNodeModulesPath: string): Promise<void> {
+  const linkPath = path.join(workspaceRoot, "node_modules");
+
+  try {
+    const stats = await lstat(linkPath);
+
+    if (stats.isSymbolicLink()) {
+      return;
+    }
+
+    await rm(linkPath, { force: true, recursive: true });
+  } catch {
+    // No existing node_modules entry in the staging workspace.
+  }
+
+  await symlink(sourceNodeModulesPath, linkPath, "junction");
+}
+
+function renderQuartzConfig(config: PublisherConfig): string {
+  const pageTitle = JSON.stringify(path.basename(config.vaultRoot) || "Obsidian Site Publisher");
+
+  return `import { QuartzConfig } from "./quartz/cfg"
+import * as Plugin from "./quartz/plugins"
+
+const config: QuartzConfig = {
+  configuration: {
+    pageTitle: ${pageTitle},
+    pageTitleSuffix: "",
+    enableSPA: true,
+    enablePopovers: true,
+    analytics: null,
+    locale: "en-US",
+    baseUrl: "localhost",
+    ignorePatterns: [".obsidian"],
+    defaultDateType: "modified",
+    theme: {
+      fontOrigin: "googleFonts",
+      cdnCaching: true,
+      typography: {
+        header: "Schibsted Grotesk",
+        body: "Source Sans Pro",
+        code: "IBM Plex Mono",
+      },
+      colors: {
+        lightMode: {
+          light: "#faf8f8",
+          lightgray: "#e5e5e5",
+          gray: "#b8b8b8",
+          darkgray: "#4e4e4e",
+          dark: "#2b2b2b",
+          secondary: "#284b63",
+          tertiary: "#84a59d",
+          highlight: "rgba(143, 159, 169, 0.15)",
+          textHighlight: "#fff23688",
+        },
+        darkMode: {
+          light: "#161618",
+          lightgray: "#393639",
+          gray: "#646464",
+          darkgray: "#d4d4d4",
+          dark: "#ebebec",
+          secondary: "#7b97aa",
+          tertiary: "#84a59d",
+          highlight: "rgba(143, 159, 169, 0.15)",
+          textHighlight: "#b3aa0288",
+        },
+      },
+    },
+  },
+  plugins: {
+    transformers: [
+      Plugin.FrontMatter(),
+      Plugin.CreatedModifiedDate({
+        priority: ["frontmatter", "git", "filesystem"],
+      }),
+      Plugin.SyntaxHighlighting({
+        theme: {
+          light: "github-light",
+          dark: "github-dark",
+        },
+        keepBackground: false,
+      }),
+      Plugin.ObsidianFlavoredMarkdown({ enableInHtmlEmbed: false }),
+      Plugin.GitHubFlavoredMarkdown(),
+      Plugin.TableOfContents(),
+      Plugin.CrawlLinks({ markdownLinkResolution: "shortest" }),
+      Plugin.Description(),
+      Plugin.Latex({ renderEngine: "katex" }),
+    ],
+    filters: [Plugin.RemoveDrafts()],
+    emitters: [
+      Plugin.AliasRedirects(),
+      Plugin.ComponentResources(),
+      Plugin.ContentPage(),
+      Plugin.FolderPage(),
+      Plugin.TagPage(),
+      Plugin.ContentIndex({
+        enableSiteMap: true,
+        enableRSS: true,
+      }),
+      Plugin.Assets(),
+      Plugin.Static(),
+      Plugin.Favicon(),
+      Plugin.NotFoundPage(),
+    ],
+  },
+}
+
+export default config
+`;
+}
+
+function renderQuartzLayout(config: PublisherConfig): string {
+  const searchComponent = config.enableSearch
+    ? `{
+          Component: Component.Search(),
+          grow: true,
+        },
+        `
+    : "";
+  const listSearchComponent = config.enableSearch
+    ? `{
+          Component: Component.Search(),
+          grow: true,
+        },
+        `
+    : "";
+  const graphComponent = config.enableGraph ? "    Component.Graph(),\n" : "";
+  const backlinksComponent = config.enableBacklinks ? "    Component.Backlinks(),\n" : "";
+
+  return `import { PageLayout, SharedLayout } from "./quartz/cfg"
+import * as Component from "./quartz/components"
+
+export const sharedPageComponents: SharedLayout = {
+  head: Component.Head(),
+  header: [],
+  afterBody: [],
+  footer: Component.Footer({
+    links: {},
+  }),
+}
+
+export const defaultContentPageLayout: PageLayout = {
+  beforeBody: [
+    Component.ConditionalRender({
+      component: Component.Breadcrumbs(),
+      condition: (page) => page.fileData.slug !== "index",
+    }),
+    Component.ArticleTitle(),
+    Component.ContentMeta(),
+    Component.TagList(),
+  ],
+  left: [
+    Component.PageTitle(),
+    Component.MobileOnly(Component.Spacer()),
+    Component.Flex({
+      components: [
+        ${searchComponent}{ Component: Component.Darkmode() },
+        { Component: Component.ReaderMode() },
+      ],
+    }),
+    Component.Explorer(),
+  ],
+  right: [
+${graphComponent}    Component.DesktopOnly(Component.TableOfContents()),
+${backlinksComponent}  ],
+}
+
+export const defaultListPageLayout: PageLayout = {
+  beforeBody: [Component.Breadcrumbs(), Component.ArticleTitle(), Component.ContentMeta()],
+  left: [
+    Component.PageTitle(),
+    Component.MobileOnly(Component.Spacer()),
+    Component.Flex({
+      components: [
+        ${listSearchComponent}{ Component: Component.Darkmode() },
+      ],
+    }),
+    Component.Explorer(),
+  ],
+  right: [],
+}
+`;
+}
+
+export async function readQuartzVersion(quartzPackageRoot: string): Promise<string> {
+  const packageJsonPath = path.join(quartzPackageRoot, "package.json");
+  const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8")) as { version?: string };
+
+  return packageJson.version ?? "unknown";
+}
