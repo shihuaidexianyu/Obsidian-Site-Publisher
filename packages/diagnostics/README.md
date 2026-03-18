@@ -17,6 +17,8 @@
 - `DiagnosticsEngine`
 - `DefaultDiagnosticsEngine`
 - `analyzeBrokenLinks`
+- `analyzeMissingAssets`
+- `analyzeUnpublishedReferences`
 - `analyzeDuplicateSlugs`
 - `analyzeDuplicatePermalinks`
 

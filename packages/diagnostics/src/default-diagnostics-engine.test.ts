@@ -19,7 +19,7 @@ const config: PublisherConfig = {
 };
 
 describe("DefaultDiagnosticsEngine", () => {
-  it("reports broken links, duplicate slugs, and unsupported objects", () => {
+  it("reports broken links, missing assets, duplicate slugs, and unsupported objects", () => {
     const manifest: VaultManifest = {
       generatedAt: new Date().toISOString(),
       vaultRoot: "/vault",
@@ -45,7 +45,12 @@ describe("DefaultDiagnosticsEngine", () => {
             }
           ],
           embeds: [],
-          assets: [],
+          assets: [
+            {
+              path: "missing.png",
+              kind: "image"
+            }
+          ],
           publish: true
         },
         {
@@ -74,9 +79,10 @@ describe("DefaultDiagnosticsEngine", () => {
 
     const issues = new DefaultDiagnosticsEngine().analyze(manifest, config);
 
-    expect(issues).toHaveLength(3);
+    expect(issues).toHaveLength(4);
     expect(issues.map((issue) => issue.code)).toEqual([
       "BROKEN_LINK",
+      "MISSING_ASSET",
       "DUPLICATE_SLUG",
       "UNSUPPORTED_CANVAS"
     ]);

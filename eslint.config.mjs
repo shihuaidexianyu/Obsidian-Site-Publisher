@@ -4,16 +4,14 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["**/dist/**", "**/node_modules/**"]
+    ignores: ["**/*.d.ts", "**/dist/**", "**/node_modules/**"]
   },
   {
     files: ["**/*.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ["vitest.config.ts"]
-        },
+        project: "./tsconfig.eslint.json",
         tsconfigRootDir: import.meta.dirname
       },
       globals: {

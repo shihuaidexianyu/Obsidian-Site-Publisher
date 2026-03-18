@@ -37,6 +37,11 @@ export class PublisherOrchestrator {
       manifest,
       mode: "build"
     });
+
+    if (shouldBlockAction(issues, config)) {
+      return createBlockedBuildResult(workspace.manifestPath, issues, config);
+    }
+
     const result = await this.dependencies.builder.build(workspace, config);
 
     return {
@@ -46,7 +51,12 @@ export class PublisherOrchestrator {
   }
 
   public async preview(config: PublisherConfig): Promise<PreviewSession> {
-    const { manifest } = await this.scan(config);
+    const { manifest, issues } = await this.scan(config);
+
+    if (shouldBlockAction(issues, config)) {
+      throw new Error(createBlockedActionMessage("preview", issues, config));
+    }
+
     const workspace = await this.dependencies.staging.prepare({
       config,
       manifest,
@@ -70,4 +80,47 @@ export class PublisherOrchestrator {
       issues: this.dependencies.diagnostics.analyze(scanResult.manifest, config)
     };
   }
+}
+
+function shouldBlockAction(issues: BuildIssue[], config: PublisherConfig): boolean {
+  return issues.some((issue) => issue.severity === "error" || (config.strictMode && issue.severity === "warning"));
+}
+
+function createBlockedBuildResult(
+  manifestPath: string,
+  issues: BuildIssue[],
+  config: PublisherConfig
+): BuildResult {
+  return {
+    success: false,
+    manifestPath,
+    issues,
+    logs: [
+      {
+        level: "warning",
+        message: createBlockedActionMessage("build", issues, config),
+        timestamp: new Date().toISOString()
+      }
+    ],
+    durationMs: 0
+  };
+}
+
+function createBlockedActionMessage(
+  action: "build" | "preview",
+  issues: BuildIssue[],
+  config: PublisherConfig
+): string {
+  const errorCount = issues.filter((issue) => issue.severity === "error").length;
+  const warningCount = issues.filter((issue) => issue.severity === "warning").length;
+
+  if (errorCount > 0) {
+    return `Cannot ${action} while ${errorCount} error issue(s) remain unresolved.`;
+  }
+
+  if (config.strictMode && warningCount > 0) {
+    return `Cannot ${action} in strict mode while ${warningCount} warning issue(s) remain unresolved.`;
+  }
+
+  return `Cannot ${action} because blocking issues were detected.`;
 }

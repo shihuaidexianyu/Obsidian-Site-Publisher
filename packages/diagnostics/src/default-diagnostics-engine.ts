@@ -2,11 +2,15 @@ import type { BuildIssue, PublisherConfig, UnsupportedObjectRecord, VaultManifes
 
 import type { DiagnosticsEngine } from "./contracts";
 import { analyzeBrokenLinks } from "./broken-link-analysis";
+import { analyzeMissingAssets } from "./missing-asset-analysis";
+import { analyzeUnpublishedReferences } from "./unpublished-reference-analysis";
 
 export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
   public analyze(manifest: VaultManifest, _config: PublisherConfig): BuildIssue[] {
     return [
       ...analyzeBrokenLinks(manifest),
+      ...analyzeMissingAssets(manifest),
+      ...analyzeUnpublishedReferences(manifest),
       ...analyzeDuplicateSlugs(manifest),
       ...analyzeDuplicatePermalinks(manifest),
       ...analyzeUnsupportedObjects(manifest.unsupportedObjects)
