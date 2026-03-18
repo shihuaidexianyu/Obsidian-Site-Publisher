@@ -78,7 +78,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
     });
 
     if (child.stdout === null || child.stderr === null) {
-      throw new Error("External publisher-cli did not expose stdout/stderr pipes.");
+      throw new Error("外部 publisher-cli 未暴露 stdout/stderr 管道。");
     }
 
     child.stdout.setEncoding("utf8");
@@ -258,7 +258,7 @@ async function runCliProcess(
   });
 
   if (child.stdout === null || child.stderr === null) {
-    throw new Error("External publisher-cli did not expose stdout/stderr pipes.");
+    throw new Error("外部 publisher-cli 未暴露 stdout/stderr 管道。");
   }
 
   child.stdout.setEncoding("utf8");

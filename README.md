@@ -23,11 +23,17 @@ The repository now contains the scaffold described in [todo.md](/c:/Users/exqin/
 Real pipeline status today:
 
 - scan / diagnose / stage / build / preview are wired through the default runtime
-- CLI calls the shared `@osp/core` orchestration path
-- the Obsidian plugin now shells out to a bundled CLI subprocess, which keeps Quartz/build work out of the renderer process
+- `publisher-cli` is a standalone program that calls the shared `@osp/core` orchestration path
+- the Obsidian plugin now shells out to an external `publisher-cli`, which keeps Quartz/build work out of the renderer process
 - deploy now has a real `local-export` target that copies a successful build into a dedicated output directory
 - deploy also supports `git-branch`, which commits the built site into a dedicated branch such as `gh-pages`
 - deploy also supports `github-pages`, including external repository URLs such as `username.github.io`
+
+Plugin packaging status today:
+
+- the installable Obsidian plugin bundle only contains plugin files such as `main.js`, `manifest.json`, and `versions.json`
+- Quartz/build/runtime complexity is isolated behind the standalone CLI instead of being bundled into the plugin
+- the plugin can use `publisher-cli` from system `PATH`, or a user-configured executable path in plugin settings
 
 Useful deploy config examples:
 

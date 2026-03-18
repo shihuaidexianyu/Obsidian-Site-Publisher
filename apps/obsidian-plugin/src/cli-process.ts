@@ -34,17 +34,33 @@ export function createCliFailureMessage(command: string, exitCode: number, stdou
     .filter((line) => line !== "")
     .at(-1);
   const detail = lastStderrLine ?? lastStdoutLine;
+  const commandLabel = formatCliCommand(command);
 
   return [
-    `CLI ${command} failed with exit code ${exitCode}.`,
-    ...(detail === undefined ? [] : [`Last CLI output: ${detail}`])
+    `外部 CLI 执行“${commandLabel}”失败，退出码为 ${exitCode}。`,
+    ...(detail === undefined ? [] : [`最后一条 CLI 输出：${detail}`])
   ].join(" ");
 }
 
 export function enrichCliLaunchError(cliEntrypoint: string, error: unknown): Error {
   if (error instanceof Error) {
-    return new Error(`Failed to run external publisher-cli at ${cliEntrypoint}: ${error.message}`);
+    return new Error(`启动外部 publisher-cli 失败：${cliEntrypoint}。${error.message}`);
   }
 
-  return new Error(`Failed to run external publisher-cli at ${cliEntrypoint}.`);
+  return new Error(`启动外部 publisher-cli 失败：${cliEntrypoint}。`);
+}
+
+function formatCliCommand(command: string): string {
+  switch (command) {
+    case "scan":
+      return "扫描";
+    case "build":
+      return "构建";
+    case "preview":
+      return "预览";
+    case "deploy":
+      return "发布";
+    default:
+      return command;
+  }
 }
