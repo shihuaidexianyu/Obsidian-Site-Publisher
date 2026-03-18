@@ -24,6 +24,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   };
   private statusBarEl?: HTMLElement;
   private controller?: PluginCommandController;
+  private stopProgressIndicator: (() => void) | undefined;
 
   public override async onload(): Promise<void> {
     const vaultRoot = resolveVaultRoot(this);
@@ -45,6 +46,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
           });
         },
         setStatus: (message) => this.statusBarEl?.setText(message),
+        beginProgress: (command) => this.beginProgressIndicator(command),
         showNotice: (message) => {
           new Notice(message);
         },
@@ -61,6 +63,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   }
 
   public override onunload(): void {
+    this.stopProgressIndicator?.();
     void this.shell.dispose();
     this.app.workspace.detachLeavesOfType(ISSUE_LIST_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(BUILD_LOG_VIEW_TYPE);
@@ -116,6 +119,31 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   private getOrCreateViewLeaf(viewType: string): WorkspaceLeaf {
     return this.app.workspace.getLeavesOfType(viewType)[0] ?? this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true);
   }
+
+  private beginProgressIndicator(command: "preview" | "build" | "publish" | "issues"): () => void {
+    this.stopProgressIndicator?.();
+
+    const baseLabel = createRunningStatusLabel(command);
+    const frames = ["[      ]", "[=     ]", "[==    ]", "[===   ]", "[ ===  ]", "[  === ]", "[   ===]", "[    ==]", "[     =]"];
+    let frameIndex = 0;
+    const render = (): void => {
+      this.statusBarEl?.setText(`站点发布：${baseLabel} ${frames[frameIndex] ?? frames[0]}`);
+      frameIndex = (frameIndex + 1) % frames.length;
+    };
+
+    render();
+    const intervalId = globalThis.setInterval(render, 180);
+    const stop = (): void => {
+      globalThis.clearInterval(intervalId);
+
+      if (this.stopProgressIndicator === stop) {
+        this.stopProgressIndicator = undefined;
+      }
+    };
+
+    this.stopProgressIndicator = stop;
+    return stop;
+  }
 }
 
 function resolveVaultRoot(plugin: Plugin): string {
@@ -124,4 +152,17 @@ function resolveVaultRoot(plugin: Plugin): string {
   }
 
   throw new Error("Obsidian Site Publisher requires FileSystemAdapter and desktop vault access.");
+}
+
+function createRunningStatusLabel(command: "preview" | "build" | "publish" | "issues"): string {
+  switch (command) {
+    case "preview":
+      return "正在启动预览";
+    case "build":
+      return "正在构建";
+    case "publish":
+      return "正在发布";
+    case "issues":
+      return "正在检查问题";
+  }
 }

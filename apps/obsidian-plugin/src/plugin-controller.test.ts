@@ -25,6 +25,7 @@ describe("PluginCommandController", () => {
     await controller.runCommand("preview");
 
     expect(shell.runCommand).toHaveBeenCalledWith("preview", createConfig("/vault"));
+    expect(host.beginProgress).toHaveBeenCalledWith("preview");
     expect(host.setStatus).toHaveBeenCalledWith("站点发布：预览已启动");
     expect(host.showNotice).toHaveBeenCalledWith("站点预览已启动：http://localhost:8080");
     expect(host.refreshViews).toHaveBeenCalledOnce();
@@ -42,6 +43,7 @@ describe("PluginCommandController", () => {
 
     await controller.runCommand("preview");
 
+    expect(host.beginProgress).toHaveBeenCalledWith("preview");
     expect(host.setStatus).toHaveBeenCalledWith("站点发布：预览失败");
     expect(host.showNotice).toHaveBeenCalledWith(
       "预览失败：Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
@@ -61,6 +63,26 @@ describe("PluginCommandController", () => {
     expect(host.revealIssueListView).toHaveBeenCalledOnce();
     expect(host.revealBuildLogView).not.toHaveBeenCalled();
     expect(host.refreshViews).toHaveBeenCalledOnce();
+  });
+
+  it("prevents starting a second command while one is still running", async () => {
+    let resolveCommand: (() => void) | undefined;
+    const host = createHost();
+    const shell = {
+      getCommandDefinitions: vi.fn(() => []),
+      runCommand: vi.fn(() => new Promise<PluginCommandResult>((resolve) => {
+        resolveCommand = () => resolve(createCommandResult("build", "站点构建完成。"));
+      }))
+    };
+    const controller = new PluginCommandController(shell, host, () => createConfig("/vault"));
+
+    const firstRun = controller.runCommand("build");
+    await controller.runCommand("publish");
+    resolveCommand?.();
+    await firstRun;
+
+    expect(shell.runCommand).toHaveBeenCalledTimes(1);
+    expect(host.showNotice).toHaveBeenCalledWith("已有任务正在运行：构建。请等待当前任务完成。");
   });
 });
 
@@ -82,6 +104,7 @@ function createHost() {
   return {
     registerCommand: vi.fn(),
     setStatus: vi.fn(),
+    beginProgress: vi.fn(() => vi.fn()),
     showNotice: vi.fn(),
     revealIssueListView: vi.fn(async () => {}),
     revealBuildLogView: vi.fn(async () => {}),

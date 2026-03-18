@@ -5,6 +5,7 @@ import type { PluginCommand, PluginCommandDefinition, PluginCommandResult } from
 export type PluginHost = {
   registerCommand(definition: PluginCommandDefinition, callback: () => Promise<void>): void;
   setStatus(message: string): void;
+  beginProgress(command: PluginCommand): () => void;
   showNotice(message: string): void;
   revealIssueListView(): Promise<void>;
   revealBuildLogView(): Promise<void>;
@@ -17,6 +18,8 @@ type PluginCommandRunner = {
 };
 
 export class PluginCommandController {
+  private activeCommand: PluginCommand | undefined;
+
   public constructor(
     private readonly shell: PluginCommandRunner,
     private readonly host: PluginHost,
@@ -32,18 +35,30 @@ export class PluginCommandController {
   }
 
   public async runCommand(command: PluginCommand): Promise<void> {
+    if (this.activeCommand !== undefined) {
+      this.host.showNotice(`已有任务正在运行：${formatCommandLabel(this.activeCommand)}。请等待当前任务完成。`);
+      return;
+    }
+
+    this.activeCommand = command;
+    const stopProgress = this.host.beginProgress(command);
+
     try {
       const result = await this.shell.runCommand(command, this.getConfig());
 
+      stopProgress();
       this.host.setStatus(createStatusBarMessage(result));
       this.host.showNotice(result.statusMessage);
       await this.syncViews(result);
     } catch (error) {
       const message = formatPluginCommandError(command, error);
 
+      stopProgress();
       this.host.setStatus(createErrorStatusBarMessage(command));
       this.host.showNotice(message);
       this.host.refreshViews();
+    } finally {
+      this.activeCommand = undefined;
     }
   }
 
@@ -61,13 +76,7 @@ export class PluginCommandController {
 }
 
 function formatPluginCommandError(command: PluginCommand, error: unknown): string {
-  const commandLabel = command === "preview"
-    ? "预览"
-    : command === "build"
-      ? "构建"
-      : command === "publish"
-        ? "发布"
-        : "检查问题";
+  const commandLabel = formatCommandLabel(command);
 
   if (error instanceof Error) {
     return `${commandLabel}失败：${error.message}`;
@@ -94,13 +103,20 @@ function createStatusBarMessage(result: PluginCommandResult): string {
 }
 
 function createErrorStatusBarMessage(command: PluginCommand): string {
-  const commandLabel = command === "preview"
-    ? "预览"
-    : command === "build"
-      ? "构建"
-      : command === "publish"
-        ? "发布"
-        : "检查";
+  const commandLabel = command === "issues" ? "检查" : formatCommandLabel(command);
 
   return `站点发布：${commandLabel}失败`;
+}
+
+function formatCommandLabel(command: PluginCommand): string {
+  switch (command) {
+    case "preview":
+      return "预览";
+    case "build":
+      return "构建";
+    case "publish":
+      return "发布";
+    case "issues":
+      return "检查问题";
+  }
 }
