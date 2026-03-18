@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveBundledCliEntrypoint, resolveBundledQuartzPackageRoot, resolvePluginInstallRoot } from "./bundled-runtime.js";
+import { resolveBundledCliEntrypoint, resolveBundledQuartzPackageRoot, resolvePluginInstallRoot } from "./bundled-cli.js";
 
 const temporaryDirectories: string[] = [];
 

@@ -4,71 +4,47 @@ import os from "node:os";
 import path from "node:path";
 
 import {
-  BuildIssueSchema,
-  BuildResultSchema,
-  DeployResultSchema,
-  PreviewSessionSchema,
+  CliBuildResultSchema,
+  CliDeployResultSchema,
+  CliPreviewResultSchema,
+  CliScanResultSchema,
   PublisherConfigSchema,
-  VaultManifestSchema
+  type BuildResult,
+  type PreviewSession,
+  type PublisherConfig
 } from "@osp/shared";
-import type { BuildResult, PreviewSession, PublisherConfig } from "@osp/shared";
-import { z } from "zod";
+import type { z } from "zod";
 
+import {
+  createCliFailureMessage,
+  createCompletedProcessTracker,
+  enrichCliLaunchError,
+  stopChildProcess
+} from "./cli-process.js";
 import type { PluginExecutionBackend, PluginPublishResult, PluginScanResult } from "./plugin-backend.js";
-
-const ScanCliResultSchema = z.object({
-  command: z.literal("scan"),
-  success: z.literal(true),
-  manifest: VaultManifestSchema,
-  issues: z.array(BuildIssueSchema)
-});
-
-const BuildCliResultSchema = z.object({
-  command: z.literal("build"),
-  success: z.boolean(),
-  result: BuildResultSchema
-});
-
-const PreviewCliResultSchema = z.object({
-  command: z.literal("preview"),
-  success: z.literal(true),
-  session: PreviewSessionSchema
-});
-
-const DeployCliResultSchema = z.object({
-  command: z.literal("deploy"),
-  success: z.boolean(),
-  build: BuildResultSchema,
-  deploy: DeployResultSchema.optional()
-});
-
 type CliBackendOptions = {
   cliEntrypoint?: string;
   quartzPackageRoot?: string;
   tempRoot?: string;
 };
-
 type CliChildProcess = ReturnType<typeof spawn>;
-
 type RunningPreview = {
   child: CliChildProcess;
   tempDir: string;
   settled: Promise<void>;
 };
-
 type CompletedCliProcess = {
   exitCode: number;
   stdout: string;
   stderr: string;
 };
-
 export class CliPluginBackend implements PluginExecutionBackend {
   private activePreview: RunningPreview | undefined;
 
   public constructor(private readonly options: CliBackendOptions) {}
 
   public async scan(config: PublisherConfig): Promise<PluginScanResult> {
-    const payload = await this.runOneShotCommand("scan", config, ScanCliResultSchema);
+    const payload = await this.runOneShotCommand("scan", config, CliScanResultSchema);
 
     return {
       manifest: payload.manifest as PluginScanResult["manifest"],
@@ -77,7 +53,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
   }
 
   public async build(config: PublisherConfig): Promise<BuildResult> {
-    const payload = await this.runOneShotCommand("build", config, BuildCliResultSchema);
+    const payload = await this.runOneShotCommand("build", config, CliBuildResultSchema);
 
     return payload.result as BuildResult;
   }
@@ -124,7 +100,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
     try {
       const session = await new Promise<PreviewSession>((resolve, reject) => {
         const resolveIfReady = (): void => {
-          const payload = tryParseCliPayload(stdout, PreviewCliResultSchema);
+          const payload = tryParseCliPayload(stdout, CliPreviewResultSchema);
 
           if (payload === undefined) {
             return;
@@ -168,7 +144,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
   }
 
   public async publish(config: PublisherConfig): Promise<PluginPublishResult> {
-    const payload = await this.runOneShotCommand("deploy", config, DeployCliResultSchema);
+    const payload = await this.runOneShotCommand("deploy", config, CliDeployResultSchema);
 
     if (payload.deploy === undefined) {
       return {
@@ -256,10 +232,8 @@ export class CliPluginBackend implements PluginExecutionBackend {
 async function writeCliConfig(configPath: string, config: PublisherConfig): Promise<void> {
   await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
 }
-
 async function createCliTempDirectory(tempRoot: string | undefined): Promise<string> {
   const baseDirectory = tempRoot ?? path.join(os.tmpdir(), "osp-plugin-cli-");
-
   return mkdtemp(baseDirectory);
 }
 
@@ -347,51 +321,4 @@ function tryParseCliPayload<TSchema extends z.ZodTypeAny>(stdout: string, schema
   }
 
   return undefined;
-}
-
-function createCompletedProcessTracker(child: CliChildProcess): Promise<void> {
-  return new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("exit", () => resolve());
-  });
-}
-
-async function stopChildProcess(child: CliChildProcess): Promise<void> {
-  if (child.exitCode !== null || child.killed) {
-    return;
-  }
-
-  const settled = new Promise<void>((resolve) => {
-    child.once("exit", () => resolve());
-  });
-
-  child.kill();
-  await settled;
-}
-
-function createCliFailureMessage(command: string, exitCode: number, stdout: string, stderr: string): string {
-  const lastStdoutLine = stdout
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line !== "")
-    .at(-1);
-  const lastStderrLine = stderr
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line !== "")
-    .at(-1);
-  const detail = lastStderrLine ?? lastStdoutLine;
-
-  return [
-    `CLI ${command} failed with exit code ${exitCode}.`,
-    ...(detail === undefined ? [] : [`Last CLI output: ${detail}`])
-  ].join(" ");
-}
-
-function enrichCliLaunchError(cliEntrypoint: string, error: unknown): Error {
-  if (error instanceof Error) {
-    return new Error(`Failed to run bundled publisher CLI at ${cliEntrypoint}: ${error.message}`);
-  }
-
-  return new Error(`Failed to run bundled publisher CLI at ${cliEntrypoint}.`);
 }

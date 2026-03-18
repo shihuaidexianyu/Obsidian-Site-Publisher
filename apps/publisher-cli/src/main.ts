@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { createDefaultPublisherRuntime } from "@osp/core";
 import type { PublisherOrchestrator } from "@osp/core";
-import type { BuildIssue, BuildResult, DeployResult, PreviewSession, PublisherConfig, VaultManifest } from "@osp/shared";
+import type { BuildIssue, BuildResult, CliJsonResult, DeployResult, PreviewSession, PublisherConfig } from "@osp/shared";
 
 import { parseCliArguments, resolveCliConfig, supportedCommands } from "./config.js";
 
@@ -24,30 +24,6 @@ export type CliRuntime = {
   createRuntime?: (options: { quartzPackageRoot?: string; preferStaticPreview: boolean }) => CliSession;
   waitForPreviewShutdown?: () => Promise<void>;
 };
-
-type CliJsonResult =
-  | {
-      command: "scan";
-      success: true;
-      manifest: VaultManifest;
-      issues: BuildIssue[];
-    }
-  | {
-      command: "build";
-      success: boolean;
-      result: BuildResult;
-    }
-  | {
-      command: "preview";
-      success: true;
-      session: PreviewSession;
-    }
-  | {
-      command: "deploy";
-      success: boolean;
-      build: BuildResult;
-      deploy?: DeployResult;
-    };
 
 export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<number> {
   const output = runtime.output ?? console;

@@ -1,13 +1,23 @@
 import { createRequire } from "node:module";
-import http from "node:http";
-import net from "node:net";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
 
 import type { BuildLogEntry, BuildResult, PreviewSession, PreparedWorkspace, PublisherConfig } from "@osp/shared";
 
 import type { BuilderAdapter } from "./contracts.js";
+import {
+  createErrorLog,
+  createQuartzRuntimeResolutionMessage,
+  stopPreviewProcess,
+  toPosixRelativePath
+} from "./quartz-builder-support.js";
+import {
+  createPreviewBuildFailureMessage,
+  createPreviewFailureMessage,
+  delay,
+  startStaticPreviewServer,
+  waitForPortReady
+} from "./quartz-preview-support.js";
 import { ensureQuartzWorkspaceRuntime, readQuartzVersion } from "./quartz-runtime.js";
 
 type QuartzBuilderAdapterOptions = {
@@ -293,83 +303,6 @@ async function ensurePreviewBuildReady(input: {
   }
 }
 
-async function startStaticPreviewServer(outputDir: string, port: number): Promise<http.Server> {
-  const server = http.createServer(async (request, response) => {
-    try {
-      const resolvedPath = await resolvePreviewRequestPath(outputDir, request.url ?? "/");
-      const body = await readFile(resolvedPath);
-
-      response.writeHead(200, {
-        "Content-Type": getContentType(resolvedPath)
-      });
-      response.end(body);
-    } catch {
-      response.writeHead(404, {
-        "Content-Type": "text/plain; charset=utf-8"
-      });
-      response.end("Not Found");
-    }
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, "127.0.0.1", () => {
-      resolve();
-    });
-  });
-
-  return server;
-}
-
-async function resolvePreviewRequestPath(outputDir: string, requestUrl: string): Promise<string> {
-  const requestedPath = decodeURIComponent((requestUrl.split("?")[0] ?? "/").replace(/\\/g, "/"));
-  const normalizedPath = requestedPath.startsWith("/") ? requestedPath : `/${requestedPath}`;
-  const candidatePaths = normalizedPath.endsWith("/")
-    ? [path.join(outputDir, normalizedPath, "index.html"), path.join(outputDir, `${normalizedPath.slice(0, -1)}.html`)]
-    : [
-        path.join(outputDir, normalizedPath),
-        path.join(outputDir, `${normalizedPath}.html`),
-        path.join(outputDir, normalizedPath, "index.html")
-      ];
-
-  for (const candidatePath of candidatePaths) {
-    try {
-      await access(candidatePath);
-      return candidatePath;
-    } catch {
-      // Try the next preview path candidate.
-    }
-  }
-
-  throw new Error(`Preview path not found for ${requestUrl}.`);
-}
-
-function getContentType(filePath: string): string {
-  switch (path.extname(filePath).toLowerCase()) {
-    case ".html":
-      return "text/html; charset=utf-8";
-    case ".css":
-      return "text/css; charset=utf-8";
-    case ".js":
-      return "text/javascript; charset=utf-8";
-    case ".json":
-      return "application/json; charset=utf-8";
-    case ".xml":
-      return "application/xml; charset=utf-8";
-    case ".svg":
-      return "image/svg+xml";
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".webp":
-      return "image/webp";
-    default:
-      return "application/octet-stream";
-  }
-}
-
 function attachProcessLogs(child: ReturnType<typeof spawn>, logs: BuildLogEntry[]): void {
   child.stdout?.setEncoding("utf8");
   child.stderr?.setEncoding("utf8");
@@ -398,111 +331,4 @@ function onceProcessExit(child: ReturnType<typeof spawn>): Promise<number> {
     child.once("error", reject);
     child.once("exit", (code) => resolve(code ?? 1));
   });
-}
-
-async function waitForPortReady(input: {
-  exitPromise: Promise<number>;
-  host: string;
-  port: number;
-  timeoutMs: number;
-}): Promise<void> {
-  const deadline = Date.now() + input.timeoutMs;
-
-  while (Date.now() < deadline) {
-    const exitState = await Promise.race([
-      input.exitPromise.then((code) => ({ kind: "exit" as const, code })),
-      delay(250).then(() => ({ kind: "wait" as const }))
-    ]);
-
-    if (exitState.kind === "exit") {
-      throw new Error(`Quartz preview exited before becoming ready with code ${exitState.code}.`);
-    }
-
-    if (await canConnect(input.host, input.port)) {
-      return;
-    }
-  }
-
-  throw new Error(`Quartz preview did not open http://localhost:${input.port} within ${input.timeoutMs}ms.`);
-}
-
-function canConnect(host: string, port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = net.createConnection({ host, port });
-
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once("error", () => {
-      socket.destroy();
-      resolve(false);
-    });
-  });
-}
-
-function delay(timeoutMs: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, timeoutMs);
-  });
-}
-
-function createErrorLog(error: unknown): BuildLogEntry {
-  return {
-    level: "error",
-    message: error instanceof Error ? error.message : "Quartz build failed with an unknown error.",
-    timestamp: new Date().toISOString()
-  };
-}
-
-function createQuartzRuntimeResolutionMessage(error: unknown): string {
-  const details = error instanceof Error ? error.message : "Unknown module resolution failure.";
-
-  return [
-    "Quartz runtime could not be resolved.",
-    "The current environment does not provide @jackyzha0/quartz as a loadable package.",
-    "If you are running the packaged Obsidian plugin, the install bundle is not self-contained for build/preview/publish yet.",
-    `Details: ${details}`
-  ].join(" ");
-}
-
-function createPreviewFailureMessage(error: unknown, logs: BuildLogEntry[]): string {
-  const lastLog = logs.at(-1)?.message;
-  const baseMessage = error instanceof Error ? error.message : "Quartz preview failed to start.";
-
-  if (lastLog === undefined) {
-    return baseMessage;
-  }
-
-  return `${baseMessage} Last Quartz log: ${lastLog}`;
-}
-
-function createPreviewBuildFailureMessage(logs: BuildLogEntry[]): string {
-  const lastErrorLog = [...logs].reverse().find((log) => log.level === "error")?.message;
-
-  if (lastErrorLog === undefined) {
-    return "Quartz preview build failed before the static preview server could start.";
-  }
-
-  return `Quartz preview build failed before the static preview server could start. Last Quartz log: ${lastErrorLog}`;
-}
-
-async function stopPreviewProcess(
-  previewProcesses: Map<string, PreviewProcessRecord>,
-  workspaceRoot: string
-): Promise<void> {
-  const record = previewProcesses.get(workspaceRoot);
-
-  if (record === undefined) {
-    return;
-  }
-
-  await record.stop();
-  previewProcesses.delete(workspaceRoot);
-}
-
-function toPosixRelativePath(rootDir: string, targetPath: string): string {
-  const relativePath = path.relative(rootDir, targetPath).replace(/\\/g, "/");
-
-  return relativePath === "" ? "." : relativePath;
 }

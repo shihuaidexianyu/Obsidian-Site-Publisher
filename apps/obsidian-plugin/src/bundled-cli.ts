@@ -3,8 +3,8 @@ import { accessSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 
 import { CliPluginBackend } from "./cli-backend.js";
-import { pluginManifest } from "./plugin-shell.js";
 import type { PluginExecutionBackend } from "./plugin-backend.js";
+import { pluginManifest } from "./plugin-shell.js";
 
 type PluginManifestLike = {
   dir: string | undefined;
