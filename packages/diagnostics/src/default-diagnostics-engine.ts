@@ -2,6 +2,8 @@ import type { BuildIssue, PublisherConfig, UnsupportedObjectRecord, VaultManifes
 
 import type { DiagnosticsEngine } from "./contracts";
 import { analyzeBrokenLinks } from "./broken-link-analysis";
+import { analyzeCircularEmbeds } from "./circular-embed-analysis";
+import { analyzeInvalidFrontmatter } from "./invalid-frontmatter-analysis";
 import { analyzeMissingAssets } from "./missing-asset-analysis";
 import { analyzeUnpublishedReferences } from "./unpublished-reference-analysis";
 
@@ -9,10 +11,12 @@ export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
   public analyze(manifest: VaultManifest, _config: PublisherConfig): BuildIssue[] {
     return [
       ...analyzeBrokenLinks(manifest),
+      ...analyzeInvalidFrontmatter(manifest),
       ...analyzeMissingAssets(manifest),
       ...analyzeUnpublishedReferences(manifest),
       ...analyzeDuplicateSlugs(manifest),
       ...analyzeDuplicatePermalinks(manifest),
+      ...analyzeCircularEmbeds(manifest),
       ...analyzeUnsupportedObjects(manifest.unsupportedObjects)
     ];
   }

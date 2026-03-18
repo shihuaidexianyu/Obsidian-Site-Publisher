@@ -67,6 +67,7 @@ export type NoteRecord = {
   embeds: EmbedRef[];
   assets: AssetRef[];
   publish: boolean;
+  frontmatterError?: string;
   permalink?: string;
   description?: string;
 };

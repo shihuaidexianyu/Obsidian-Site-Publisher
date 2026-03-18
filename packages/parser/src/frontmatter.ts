@@ -4,14 +4,15 @@ export type FrontmatterFields = {
   properties: Record<string, unknown>;
   publish: boolean;
   aliases: string[];
+  frontmatterError?: string;
   permalink?: string;
   description?: string;
 };
 
 export function parseFrontmatterFields(markdownSource: string): FrontmatterFields {
-  const frontmatterBlock = extractFrontmatterBlock(markdownSource);
+  const frontmatterSection = parseLeadingFrontmatterSection(markdownSource);
 
-  if (frontmatterBlock === undefined) {
+  if (frontmatterSection === undefined) {
     return {
       properties: {},
       publish: false,
@@ -19,47 +20,64 @@ export function parseFrontmatterFields(markdownSource: string): FrontmatterField
     };
   }
 
-  const parsedProperties = parseFrontmatterObject(frontmatterBlock);
+  const parsedFrontmatter = parseFrontmatterObject(frontmatterSection.block);
   const fields: FrontmatterFields = {
-    properties: parsedProperties,
-    publish: parsedProperties.publish === true,
-    aliases: readAliases(parsedProperties.aliases)
+    properties: parsedFrontmatter.properties,
+    publish: parsedFrontmatter.properties.publish === true,
+    aliases: readAliases(parsedFrontmatter.properties.aliases)
   };
 
-  if (typeof parsedProperties.permalink === "string") {
-    fields.permalink = parsedProperties.permalink;
+  if (parsedFrontmatter.error !== undefined) {
+    fields.frontmatterError = parsedFrontmatter.error;
   }
 
-  if (typeof parsedProperties.description === "string") {
-    fields.description = parsedProperties.description;
+  if (typeof parsedFrontmatter.properties.permalink === "string") {
+    fields.permalink = parsedFrontmatter.properties.permalink;
+  }
+
+  if (typeof parsedFrontmatter.properties.description === "string") {
+    fields.description = parsedFrontmatter.properties.description;
   }
 
   return fields;
 }
 
-function extractFrontmatterBlock(markdownSource: string): string | undefined {
-  const match = markdownSource.match(/^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/);
-
-  return match?.[1];
-}
-
 export function stripLeadingFrontmatter(markdownSource: string): string {
-  return markdownSource.replace(/^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)(?:\r?\n|$)/, "");
+  return parseLeadingFrontmatterSection(markdownSource)?.rest ?? markdownSource;
 }
 
-function parseFrontmatterObject(frontmatterBlock: string): Record<string, unknown> {
+function parseFrontmatterObject(frontmatterBlock: string): {
+  properties: Record<string, unknown>;
+  error?: string;
+} {
   try {
     const document = parseDocument(frontmatterBlock);
+
+    if (document.errors.length > 0) {
+      return {
+        properties: {},
+        error: "Frontmatter could not be parsed as YAML."
+      };
+    }
+
     const frontmatterValue = document.toJS();
 
     if (isRecord(frontmatterValue)) {
-      return frontmatterValue;
+      return {
+        properties: frontmatterValue
+      };
     }
-  } catch {
-    return {};
-  }
 
-  return {};
+    return {
+      properties: {},
+      error: "Frontmatter must be a YAML object."
+    };
+  } catch {
+    return {
+      properties: {},
+      error: "Frontmatter could not be parsed as YAML."
+    };
+  }
 }
 
 function readAliases(aliasesValue: unknown): string[] {
@@ -76,4 +94,29 @@ function readAliases(aliasesValue: unknown): string[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseLeadingFrontmatterSection(
+  markdownSource: string
+): { block: string; rest: string } | undefined {
+  const normalizedSource = markdownSource.replace(/\r\n/g, "\n");
+
+  if (!normalizedSource.startsWith("---\n")) {
+    return undefined;
+  }
+
+  const lines = normalizedSource.split("\n");
+
+  for (let lineIndex = 1; lineIndex < lines.length; lineIndex += 1) {
+    if (lines[lineIndex] !== "---" && lines[lineIndex] !== "...") {
+      continue;
+    }
+
+    return {
+      block: lines.slice(1, lineIndex).join("\n"),
+      rest: lines.slice(lineIndex + 1).join("\n")
+    };
+  }
+
+  return undefined;
 }

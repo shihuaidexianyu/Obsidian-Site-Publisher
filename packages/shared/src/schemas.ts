@@ -57,6 +57,7 @@ export const NoteRecordSchema = z.object({
   embeds: z.array(EmbedRefSchema),
   assets: z.array(AssetRefSchema),
   publish: z.boolean(),
+  frontmatterError: z.string().optional(),
   permalink: z.string().optional(),
   description: z.string().optional()
 });

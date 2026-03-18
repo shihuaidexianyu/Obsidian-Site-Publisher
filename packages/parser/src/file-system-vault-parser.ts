@@ -111,6 +111,10 @@ async function createNoteRecord(
     publish: frontmatterFields.publish
   };
 
+  if (frontmatterFields.frontmatterError !== undefined) {
+    noteRecord.frontmatterError = frontmatterFields.frontmatterError;
+  }
+
   if (frontmatterFields.permalink !== undefined) {
     noteRecord.permalink = frontmatterFields.permalink;
   }

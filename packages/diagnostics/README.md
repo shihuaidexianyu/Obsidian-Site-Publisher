@@ -4,7 +4,7 @@
 
 - deterministic diagnostics over a normalized manifest
 - duplicate and unsupported-object detection
-- future broken-link and unpublished-reference analysis
+- broken-link, asset, frontmatter, and embed-cycle analysis
 
 ## Not Responsible For
 
@@ -19,8 +19,10 @@
 - `analyzeBrokenLinks`
 - `analyzeMissingAssets`
 - `analyzeUnpublishedReferences`
+- `analyzeInvalidFrontmatter`
 - `analyzeDuplicateSlugs`
 - `analyzeDuplicatePermalinks`
+- `analyzeCircularEmbeds`
 
 ## Depends On
 

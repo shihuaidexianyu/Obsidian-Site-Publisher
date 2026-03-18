@@ -19,7 +19,7 @@ const config: PublisherConfig = {
 };
 
 describe("DefaultDiagnosticsEngine", () => {
-  it("reports broken links, missing assets, duplicate slugs, and unsupported objects", () => {
+  it("reports broken links, invalid frontmatter, missing assets, duplicate slugs, circular embeds, and unsupported objects", () => {
     const manifest: VaultManifest = {
       generatedAt: new Date().toISOString(),
       vaultRoot: "/vault",
@@ -44,14 +44,21 @@ describe("DefaultDiagnosticsEngine", () => {
               }
             }
           ],
-          embeds: [],
+          embeds: [
+            {
+              raw: "![[C]]",
+              target: "C",
+              kind: "note"
+            }
+          ],
           assets: [
             {
               path: "missing.png",
               kind: "image"
             }
           ],
-          publish: true
+          publish: true,
+          frontmatterError: "Frontmatter could not be parsed as YAML."
         },
         {
           id: "2",
@@ -63,7 +70,33 @@ describe("DefaultDiagnosticsEngine", () => {
           blockIds: [],
           properties: {},
           links: [],
-          embeds: [],
+          embeds: [
+            {
+              raw: "![[A]]",
+              target: "A",
+              kind: "note"
+            }
+          ],
+          assets: [],
+          publish: true
+        },
+        {
+          id: "3",
+          path: "Notes/C.md",
+          title: "C",
+          slug: "c",
+          aliases: [],
+          headings: [],
+          blockIds: [],
+          properties: {},
+          links: [],
+          embeds: [
+            {
+              raw: "![[B]]",
+              target: "B",
+              kind: "note"
+            }
+          ],
           assets: [],
           publish: true
         }
@@ -79,11 +112,13 @@ describe("DefaultDiagnosticsEngine", () => {
 
     const issues = new DefaultDiagnosticsEngine().analyze(manifest, config);
 
-    expect(issues).toHaveLength(4);
+    expect(issues).toHaveLength(6);
     expect(issues.map((issue) => issue.code)).toEqual([
       "BROKEN_LINK",
+      "INVALID_FRONTMATTER",
       "MISSING_ASSET",
       "DUPLICATE_SLUG",
+      "CIRCULAR_EMBED",
       "UNSUPPORTED_CANVAS"
     ]);
   });
