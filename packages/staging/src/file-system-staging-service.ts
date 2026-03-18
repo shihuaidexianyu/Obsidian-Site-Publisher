@@ -1,10 +1,11 @@
-import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { findMatchingAsset, normalizeVaultPath, selectPublishedNotes } from "@osp/shared";
 import type { AssetRef, NoteRecord, PreparedWorkspace, VaultManifest } from "@osp/shared";
 
 import type { PrepareStagingInput, StagingService } from "./contracts.js";
+import { normalizeStagedMarkdown } from "./markdown-normalization.js";
 
 export class FileSystemStagingService implements StagingService {
   public async prepare(input: PrepareStagingInput): Promise<PreparedWorkspace> {
@@ -20,7 +21,7 @@ export class FileSystemStagingService implements StagingService {
     await rm(rootDir, { recursive: true, force: true });
     await mkdir(contentDir, { recursive: true });
     await mkdir(outputDir, { recursive: true });
-    await copyVaultFiles(input.config.vaultRoot, contentDir, publishedNotes.map((note) => note.path));
+    await copyVaultNotes(input.config.vaultRoot, contentDir, publishedNotes.map((note) => note.path));
     await copyVaultFiles(input.config.vaultRoot, contentDir, referencedAssets.map((asset) => asset.path));
     await writeGeneratedHomePage(contentDir, generatedHomePage);
     await writeFile(manifestPath, JSON.stringify(stagedManifest, null, 2), "utf8");
@@ -135,6 +136,17 @@ async function writeGeneratedHomePage(
   }
 
   await writeFile(path.join(contentDir, generatedHomePage.note.path), generatedHomePage.content, "utf8");
+}
+
+async function copyVaultNotes(vaultRoot: string, targetRoot: string, relativePaths: string[]): Promise<void> {
+  for (const relativePath of relativePaths) {
+    const sourcePath = path.join(vaultRoot, relativePath);
+    const destinationPath = path.join(targetRoot, relativePath);
+    const markdownSource = await readFile(sourcePath, "utf8");
+
+    await mkdir(path.dirname(destinationPath), { recursive: true });
+    await writeFile(destinationPath, normalizeStagedMarkdown(markdownSource), "utf8");
+  }
 }
 
 async function copyVaultFiles(vaultRoot: string, targetRoot: string, relativePaths: string[]): Promise<void> {

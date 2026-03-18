@@ -204,6 +204,56 @@ describe("FileSystemStagingService", () => {
 
     expect(stagedManifest.notes.map((note) => note.path)).toEqual(["Guides/Start.md", "Guides/Deep Dive.md", "index.md"]);
   });
+
+  it("normalizes Obsidian-authored math wrappers without disturbing following mermaid fences", async () => {
+    const vaultRoot = await createTempDirectory("osp-staging-markdown-vault-");
+    const stagingRoot = await createTempDirectory("osp-staging-markdown-root-");
+
+    await writeVaultFile(
+      vaultRoot,
+      "Math.md",
+      [
+        "因为 70 落在刚才得到的 95% 置信区间 ($$",
+        "69.94,78.06",
+        "",
+        "$$",
+        ") 内，所以在 0.05 水平下不会拒绝零假设。",
+        "",
+        "$$",
+        "",
+        "d=0.33",
+        "",
+        "$$",
+        "",
+        "```mermaid",
+        "flowchart TD",
+        "  A --> B",
+        "```",
+        ""
+      ].join("\n")
+    );
+
+    const manifest = createManifest(vaultRoot, {
+      notes: [
+        createNote("Math.md", {
+          publish: true
+        })
+      ]
+    });
+
+    const workspace = await new FileSystemStagingService().prepare({
+      config: createConfig(vaultRoot),
+      manifest,
+      mode: "build",
+      stagingRoot
+    });
+
+    const stagedMarkdown = await readFile(path.join(workspace.contentDir, "Math.md"), "utf8");
+
+    expect(stagedMarkdown).toContain("95% 置信区间 $69.94,78.06$ 内");
+    expect(stagedMarkdown).toContain("$$\nd=0.33\n$$");
+    expect(stagedMarkdown).toContain("```mermaid\nflowchart TD");
+  });
 });
 
 function createConfig(
