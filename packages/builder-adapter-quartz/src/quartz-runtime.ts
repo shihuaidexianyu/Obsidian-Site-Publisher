@@ -11,6 +11,7 @@ export async function ensureQuartzWorkspaceRuntime(
   quartzPackageRoot: string
 ): Promise<void> {
   await mkdir(workspace.rootDir, { recursive: true });
+  await ensureQuartzWorkspaceGitBoundary(workspace.rootDir);
   await cp(path.join(quartzPackageRoot, "quartz"), path.join(workspace.rootDir, "quartz"), {
     force: true,
     recursive: true
@@ -25,6 +26,13 @@ export async function ensureQuartzWorkspaceRuntime(
   await ensureNodeModulesLink(workspace.rootDir, path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules"));
   await writeFile(path.join(workspace.rootDir, "quartz.config.ts"), renderQuartzConfig(config), "utf8");
   await writeFile(path.join(workspace.rootDir, "quartz.layout.ts"), renderQuartzLayout(config), "utf8");
+}
+
+async function ensureQuartzWorkspaceGitBoundary(workspaceRoot: string): Promise<void> {
+  // Quartz enables globby's gitignore support by default. Our staged workspaces often
+  // live under ignored paths such as `.osp/` or `.generated/`, so without a local git
+  // boundary Quartz walks up to the repository root and filters out every staged note.
+  await mkdir(path.join(workspaceRoot, ".git"), { recursive: true });
 }
 
 async function ensureNodeModulesLink(workspaceRoot: string, sourceNodeModulesPath: string): Promise<void> {

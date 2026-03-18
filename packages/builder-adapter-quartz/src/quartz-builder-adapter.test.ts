@@ -66,6 +66,28 @@ describe("QuartzBuilderAdapter", () => {
     },
     90_000
   );
+
+  it(
+    "builds content from a workspace located under an ignored repository path",
+    async () => {
+      const ignoredRoot = path.resolve(".generated", `osp-quartz-ignored-${Date.now()}`);
+
+      temporaryDirectories.push(ignoredRoot);
+
+      const workspace = await createPreparedWorkspaceAt(ignoredRoot);
+      const adapter = new QuartzBuilderAdapter();
+
+      const result = await adapter.build(workspace, createConfig(workspace.rootDir));
+
+      expect(result.success).toBe(true);
+      await expect(access(path.join(workspace.outputDir, "index.html"))).resolves.toBeUndefined();
+
+      const indexHtml = await readFile(path.join(workspace.outputDir, "index.html"), "utf8");
+
+      expect(indexHtml).toContain("Hello Quartz");
+    },
+    60_000
+  );
 });
 
 function createConfig(vaultRoot: string): PublisherConfig {
@@ -88,6 +110,11 @@ async function createPreparedWorkspace(prefix: string): Promise<PreparedWorkspac
   const rootDir = await mkdtemp(path.join(os.tmpdir(), prefix));
 
   temporaryDirectories.push(rootDir);
+  return createPreparedWorkspaceAt(rootDir);
+}
+
+async function createPreparedWorkspaceAt(rootDir: string): Promise<PreparedWorkspace> {
+  await mkdir(rootDir, { recursive: true });
 
   const contentDir = path.join(rootDir, "content");
   const outputDir = path.join(rootDir, "dist");

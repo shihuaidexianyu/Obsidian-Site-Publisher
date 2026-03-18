@@ -188,4 +188,41 @@ describe("DefaultDiagnosticsEngine", () => {
     expect(issues[0]?.file).toBe("Public/Home.md");
     expect(issues[1]?.message).toContain('references unpublished note "Private/Secret.md"');
   });
+
+  it("warns when the publish slice is empty", () => {
+    const manifest: VaultManifest = {
+      generatedAt: new Date().toISOString(),
+      vaultRoot: "/vault",
+      notes: [
+        {
+          id: "1",
+          path: "Drafts/Only.md",
+          title: "Only",
+          slug: "only",
+          aliases: [],
+          headings: [],
+          blockIds: [],
+          properties: {},
+          links: [],
+          embeds: [],
+          assets: [],
+          publish: false
+        }
+      ],
+      assetFiles: [],
+      unsupportedObjects: []
+    };
+
+    const issues = new DefaultDiagnosticsEngine().analyze(manifest, config);
+
+    expect(issues).toEqual([
+      {
+        code: "EMPTY_PUBLISH_SLICE",
+        severity: "warning",
+        file: "/vault",
+        message: "No notes matched the current publish selection, so the generated site will be effectively empty.",
+        suggestion: 'Switch to folder mode, adjust publishRoot/includeGlobs, or add `publish: true` to at least one note.'
+      }
+    ]);
+  });
 });

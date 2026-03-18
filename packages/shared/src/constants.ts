@@ -1,6 +1,7 @@
 export const issueCodes = [
   "BROKEN_LINK",
   "MISSING_ASSET",
+  "EMPTY_PUBLISH_SLICE",
   "UNSUPPORTED_CANVAS",
   "UNSUPPORTED_BASE",
   "DUPLICATE_SLUG",

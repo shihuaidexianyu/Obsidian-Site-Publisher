@@ -9,6 +9,7 @@ export type DeployTarget = "none" | "local-export" | "git-branch" | "github-page
 export type IssueCode =
   | "BROKEN_LINK"
   | "MISSING_ASSET"
+  | "EMPTY_PUBLISH_SLICE"
   | "UNSUPPORTED_CANVAS"
   | "UNSUPPORTED_BASE"
   | "DUPLICATE_SLUG"

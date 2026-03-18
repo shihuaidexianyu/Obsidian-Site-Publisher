@@ -14,6 +14,7 @@ export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
     const publishedNotes = selectPublishedNotes(manifest, config);
 
     return [
+      ...analyzeEmptyPublishSlice(publishedNotes, config),
       ...analyzeBrokenLinks(manifest, publishedNotePaths),
       ...analyzeInvalidFrontmatter(manifest),
       ...analyzeMissingAssets(manifest, publishedNotePaths),
@@ -24,6 +25,22 @@ export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
       ...analyzeUnsupportedObjects(manifest.unsupportedObjects)
     ];
   }
+}
+
+function analyzeEmptyPublishSlice(notes: VaultManifest["notes"], config: PublisherConfig): BuildIssue[] {
+  if (notes.length > 0) {
+    return [];
+  }
+
+  return [
+    {
+      code: "EMPTY_PUBLISH_SLICE",
+      severity: "warning",
+      file: config.publishRoot ?? config.vaultRoot,
+      message: "No notes matched the current publish selection, so the generated site will be effectively empty.",
+      suggestion: 'Switch to folder mode, adjust publishRoot/includeGlobs, or add `publish: true` to at least one note.'
+    }
+  ];
 }
 
 export function analyzeDuplicateSlugs(notes: VaultManifest["notes"]): BuildIssue[] {
