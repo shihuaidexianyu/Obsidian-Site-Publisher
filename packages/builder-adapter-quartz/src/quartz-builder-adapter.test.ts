@@ -68,6 +68,33 @@ describe("QuartzBuilderAdapter", () => {
   );
 
   it(
+    "starts a static preview fallback server when requested",
+    async () => {
+      const workspace = await createPreparedWorkspace("osp-quartz-static-preview-");
+      const previewPort = await getAvailablePort();
+      const adapter = new QuartzBuilderAdapter({
+        preferStaticPreview: true,
+        previewPort
+      });
+
+      try {
+        const session = await adapter.preview(workspace, createConfig(workspace.rootDir));
+
+        expect(session.url).toBe(`http://localhost:${previewPort}`);
+
+        const response = await fetch(session.url);
+        const html = await response.text();
+
+        expect(response.ok).toBe(true);
+        expect(html).toContain("Hello Quartz");
+      } finally {
+        await adapter.stopPreview(workspace.rootDir);
+      }
+    },
+    90_000
+  );
+
+  it(
     "builds content from a workspace located under an ignored repository path",
     async () => {
       const ignoredRoot = path.resolve(".generated", `osp-quartz-ignored-${Date.now()}`);

@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveBundledQuartzPackageRoot, resolvePluginInstallRoot } from "./bundled-runtime.js";
+import { resolveBundledCliEntrypoint, resolveBundledQuartzPackageRoot, resolvePluginInstallRoot } from "./bundled-runtime.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -37,6 +37,19 @@ describe("bundled runtime helpers", () => {
 
   it("returns undefined when the plugin bundle does not contain a packaged Quartz runtime", () => {
     expect(resolveBundledQuartzPackageRoot("/missing-plugin")).toBeUndefined();
+  });
+
+  it("returns undefined when the plugin bundle does not contain a bundled CLI entrypoint", () => {
+    expect(resolveBundledCliEntrypoint("/missing-plugin")).toBeUndefined();
+  });
+
+  it("resolves the bundled CLI entrypoint from the plugin install root", async () => {
+    const pluginRoot = await mkdtemp(path.join(os.tmpdir(), "osp-plugin-runtime-"));
+
+    temporaryDirectories.push(pluginRoot);
+    await writeFile(path.join(pluginRoot, "cli.js"), "console.log('cli');", "utf8");
+
+    expect(resolveBundledCliEntrypoint(pluginRoot)).toBe(path.join(pluginRoot, "cli.js"));
   });
 
   it("resolves the vendored Quartz package from the plugin runtime directory", async () => {

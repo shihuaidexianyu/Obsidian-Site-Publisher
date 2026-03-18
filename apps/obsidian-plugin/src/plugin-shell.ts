@@ -1,6 +1,6 @@
-import { createDefaultPublisherRuntime } from "@osp/core";
-import type { PublisherOrchestrator } from "@osp/core";
 import type { BuildIssue, BuildLogEntry, BuildResult, DeployResult, PreviewSession, PublisherConfig, VaultManifest } from "@osp/shared";
+
+import type { PluginExecutionBackend, PluginPublishResult, PluginScanResult } from "./plugin-backend.js";
 
 export const pluginManifest = {
   id: "obsidian-site-publisher",
@@ -51,13 +51,6 @@ export type PluginCommandResult =
       statusMessage: string;
     };
 
-type PluginOrchestrator = Pick<PublisherOrchestrator, "scan" | "build" | "preview" | "deployFromBuild">;
-
-type PluginRuntime = {
-  orchestrator: PluginOrchestrator;
-  stop(): Promise<void>;
-};
-
 const defaultState: PluginExecutionState = {
   lastIssues: [],
   lastLogs: []
@@ -65,9 +58,9 @@ const defaultState: PluginExecutionState = {
 
 export class PublisherPluginShell {
   private state: PluginExecutionState = defaultState;
-  private activePreviewRuntime: PluginRuntime | undefined;
+  private activePreviewBackend: PluginExecutionBackend | undefined;
 
-  public constructor(private readonly createRuntime: () => PluginRuntime = createDefaultPublisherRuntime) {}
+  public constructor(private readonly createBackend: () => PluginExecutionBackend = createUnavailableBackend) {}
 
   public getSupportedCommands(): PluginCommand[] {
     return this.getCommandDefinitions().map((definition) => definition.command);
@@ -113,21 +106,18 @@ export class PublisherPluginShell {
   public async runCommand(command: PluginCommand, config: PublisherConfig): Promise<PluginCommandResult> {
     switch (command) {
       case "issues":
-        return this.withEphemeralRuntime(async (runtime) => this.runIssuesCommand(runtime.orchestrator, config));
+        return this.withEphemeralBackend(async (backend) => this.runIssuesCommand(backend, config));
       case "build":
-        return this.withEphemeralRuntime(async (runtime) => this.runBuildCommand(runtime.orchestrator, config));
+        return this.withEphemeralBackend(async (backend) => this.runBuildCommand(backend, config));
       case "preview":
         return this.runPreviewCommand(config);
       case "publish":
-        return this.withEphemeralRuntime(async (runtime) => this.runPublishCommand(runtime.orchestrator, config));
+        return this.withEphemeralBackend(async (backend) => this.runPublishCommand(backend, config));
     }
   }
 
-  private async runIssuesCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "issues" }>> {
-    const report = await orchestrator.scan(config);
+  private async runIssuesCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "issues" }>> {
+    const report = await backend.scan(config);
     const statusMessage = createIssuesStatusMessage(report.issues.length);
 
     this.updateState({
@@ -149,11 +139,8 @@ export class PublisherPluginShell {
     };
   }
 
-  private async runBuildCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "build" }>> {
-    const result = await orchestrator.build(config);
+  private async runBuildCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "build" }>> {
+    const result = await backend.build(config);
     const statusMessage = result.success ? "Build completed successfully." : "Build failed. Check issues and logs.";
 
     this.updateState({
@@ -176,13 +163,13 @@ export class PublisherPluginShell {
   private async runPreviewCommand(config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "preview" }>> {
     await this.stopActivePreview();
 
-    const runtime = this.createRuntime();
+    const backend = this.createBackend();
 
     try {
-      const session = await runtime.orchestrator.preview(config);
+      const session = await backend.preview(config);
       const statusMessage = `Preview ready at ${session.url}`;
 
-      this.activePreviewRuntime = runtime;
+      this.activePreviewBackend = backend;
       this.updateState({
         lastCommand: "preview",
         statusMessage,
@@ -199,16 +186,13 @@ export class PublisherPluginShell {
         statusMessage
       };
     } catch (error) {
-      await runtime.stop();
+      await backend.dispose();
       throw error;
     }
   }
 
-  private async runPublishCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "publish" }>> {
-    const build = await orchestrator.build(config);
+  private async runPublishCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "publish" }>> {
+    const { build, deploy } = await backend.publish(config);
 
     if (!build.success) {
       const statusMessage = "Publish stopped because build did not succeed.";
@@ -230,8 +214,12 @@ export class PublisherPluginShell {
       };
     }
 
-    const deploy = await orchestrator.deployFromBuild(build, config);
-    const statusMessage = deploy.success ? "Publish completed successfully." : "Deploy failed after a successful build.";
+    const statusMessage =
+      deploy === undefined
+        ? "Build completed, but the deploy step did not return a result."
+        : deploy.success
+          ? "Publish completed successfully."
+          : "Deploy failed after a successful build.";
 
     this.updateState({
       lastCommand: "publish",
@@ -246,7 +234,7 @@ export class PublisherPluginShell {
     return {
       command: "publish",
       build,
-      deploy,
+      ...(deploy === undefined ? {} : { deploy }),
       statusMessage
     };
   }
@@ -261,24 +249,44 @@ export class PublisherPluginShell {
     };
   }
 
-  private async withEphemeralRuntime<T>(callback: (runtime: PluginRuntime) => Promise<T>): Promise<T> {
-    const runtime = this.createRuntime();
+  private async withEphemeralBackend<T>(callback: (backend: PluginExecutionBackend) => Promise<T>): Promise<T> {
+    const backend = this.createBackend();
 
     try {
-      return await callback(runtime);
+      return await callback(backend);
     } finally {
-      await runtime.stop();
+      await backend.dispose();
     }
   }
 
   private async stopActivePreview(): Promise<void> {
-    if (this.activePreviewRuntime === undefined) {
+    if (this.activePreviewBackend === undefined) {
       return;
     }
 
-    await this.activePreviewRuntime.stop();
-    this.activePreviewRuntime = undefined;
+    await this.activePreviewBackend.dispose();
+    this.activePreviewBackend = undefined;
   }
+}
+
+function createUnavailableBackend(): PluginExecutionBackend {
+  const createError = (): Error => new Error("Obsidian Site Publisher backend is not configured.");
+
+  return {
+    async scan(): Promise<PluginScanResult> {
+      throw createError();
+    },
+    async build(): Promise<BuildResult> {
+      throw createError();
+    },
+    async preview(): Promise<PreviewSession> {
+      throw createError();
+    },
+    async publish(): Promise<PluginPublishResult> {
+      throw createError();
+    },
+    async dispose(): Promise<void> {}
+  };
 }
 
 function createCommandDefinition(command: PluginCommand, name: string): PluginCommandDefinition {

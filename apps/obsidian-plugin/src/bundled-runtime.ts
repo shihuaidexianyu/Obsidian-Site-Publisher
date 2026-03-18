@@ -2,24 +2,27 @@ import path from "node:path";
 import { accessSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 
-import { createDefaultPublisherRuntime, type DefaultPublisherRuntime } from "@osp/core";
+import { CliPluginBackend } from "./cli-backend.js";
 import { pluginManifest } from "./plugin-shell.js";
+import type { PluginExecutionBackend } from "./plugin-backend.js";
 
 type PluginManifestLike = {
   dir: string | undefined;
   id: string;
 };
 
-export function createBundledPluginRuntimeFactory(
+export function createBundledPluginCliBackendFactory(
   vaultRoot: string,
   manifest: PluginManifestLike
-): () => DefaultPublisherRuntime {
+): () => PluginExecutionBackend {
   const pluginInstallRoot = resolvePluginInstallRoot(vaultRoot, manifest);
+  const cliEntrypoint = resolveBundledCliEntrypoint(pluginInstallRoot);
   const quartzPackageRoot = resolveBundledQuartzPackageRoot(pluginInstallRoot);
 
   return () =>
-    createDefaultPublisherRuntime({
-      ...(quartzPackageRoot === undefined ? {} : { builder: { quartzPackageRoot } })
+    new CliPluginBackend({
+      ...(cliEntrypoint === undefined ? {} : { cliEntrypoint }),
+      ...(quartzPackageRoot === undefined ? {} : { quartzPackageRoot })
     });
 }
 
@@ -40,6 +43,17 @@ export function resolveBundledQuartzPackageRoot(pluginInstallRoot: string): stri
 
     const runtimeRequire = createRequire(runtimePackageJsonPath);
     return path.dirname(runtimeRequire.resolve("@jackyzha0/quartz/package.json"));
+  } catch {
+    return undefined;
+  }
+}
+
+export function resolveBundledCliEntrypoint(pluginInstallRoot: string): string | undefined {
+  const cliEntrypointPath = path.join(pluginInstallRoot, "cli.js");
+
+  try {
+    accessSync(cliEntrypointPath);
+    return cliEntrypointPath;
   } catch {
     return undefined;
   }

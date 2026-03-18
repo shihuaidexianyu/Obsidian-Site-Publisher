@@ -1,9 +1,8 @@
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { createDefaultPublisherRuntime } from "@osp/core";
 import type { PublisherOrchestrator } from "@osp/core";
-import type { BuildIssue, BuildResult, DeployResult, PreviewSession, PublisherConfig } from "@osp/shared";
+import type { BuildIssue, BuildResult, DeployResult, PreviewSession, PublisherConfig, VaultManifest } from "@osp/shared";
 
 import { parseCliArguments, resolveCliConfig, supportedCommands } from "./config.js";
 
@@ -22,9 +21,33 @@ type CliSession = {
 export type CliRuntime = {
   cwd?: string;
   output?: CliOutput;
-  createRuntime?: () => CliSession;
+  createRuntime?: (options: { quartzPackageRoot?: string; preferStaticPreview: boolean }) => CliSession;
   waitForPreviewShutdown?: () => Promise<void>;
 };
+
+type CliJsonResult =
+  | {
+      command: "scan";
+      success: true;
+      manifest: VaultManifest;
+      issues: BuildIssue[];
+    }
+  | {
+      command: "build";
+      success: boolean;
+      result: BuildResult;
+    }
+  | {
+      command: "preview";
+      success: true;
+      session: PreviewSession;
+    }
+  | {
+      command: "deploy";
+      success: boolean;
+      build: BuildResult;
+      deploy?: DeployResult;
+    };
 
 export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<number> {
   const output = runtime.output ?? console;
@@ -46,19 +69,41 @@ export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<
 
   try {
     const resolvedConfig = await resolveCliConfig(parsedArguments.options, cwd);
+    const builderOptions = {
+      ...(parsedArguments.options.quartzPackageRoot === undefined
+        ? {}
+        : { quartzPackageRoot: path.resolve(cwd, parsedArguments.options.quartzPackageRoot) }),
+      ...(parsedArguments.options.preferStaticPreview ? { preferStaticPreview: true } : {})
+    };
 
-    cliRuntime = runtime.createRuntime?.() ?? createDefaultPublisherRuntime();
-    output.log(createConfigSourceMessage(resolvedConfig.configPath, resolvedConfig.config.vaultRoot));
+    cliRuntime =
+      runtime.createRuntime?.({
+        ...(builderOptions.quartzPackageRoot === undefined ? {} : { quartzPackageRoot: builderOptions.quartzPackageRoot }),
+        preferStaticPreview: parsedArguments.options.preferStaticPreview
+      }) ??
+      createDefaultPublisherRuntime({
+        builder: builderOptions
+      });
+
+    if (!parsedArguments.options.json) {
+      output.log(createConfigSourceMessage(resolvedConfig.configPath, resolvedConfig.config.vaultRoot));
+    }
 
     switch (parsedArguments.command) {
       case "scan":
-        return await runScanCommand(cliRuntime.orchestrator, resolvedConfig.config, output);
+        return await runScanCommand(cliRuntime.orchestrator, resolvedConfig.config, output, parsedArguments.options.json);
       case "build":
-        return await runBuildCommand(cliRuntime.orchestrator, resolvedConfig.config, output);
+        return await runBuildCommand(cliRuntime.orchestrator, resolvedConfig.config, output, parsedArguments.options.json);
       case "preview":
-        return await runPreviewCommand(cliRuntime, resolvedConfig.config, output, runtime.waitForPreviewShutdown);
+        return await runPreviewCommand(
+          cliRuntime,
+          resolvedConfig.config,
+          output,
+          runtime.waitForPreviewShutdown,
+          parsedArguments.options.json
+        );
       case "deploy":
-        return await runDeployCommand(cliRuntime.orchestrator, resolvedConfig.config, output);
+        return await runDeployCommand(cliRuntime.orchestrator, resolvedConfig.config, output, parsedArguments.options.json);
     }
 
     return 1;
@@ -73,9 +118,20 @@ export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<
 async function runScanCommand(
   orchestrator: CliOrchestrator,
   config: PublisherConfig,
-  output: CliOutput
+  output: CliOutput,
+  json: boolean
 ): Promise<number> {
   const report = await orchestrator.scan(config);
+
+  if (json) {
+    printJson(output, {
+      command: "scan",
+      success: true,
+      manifest: report.manifest,
+      issues: report.issues
+    });
+    return 0;
+  }
 
   output.log(
     [
@@ -93,9 +149,19 @@ async function runScanCommand(
 async function runBuildCommand(
   orchestrator: CliOrchestrator,
   config: PublisherConfig,
-  output: CliOutput
+  output: CliOutput,
+  json: boolean
 ): Promise<number> {
   const result = await orchestrator.build(config);
+
+  if (json) {
+    printJson(output, {
+      command: "build",
+      success: result.success,
+      result
+    });
+    return result.success ? 0 : 1;
+  }
 
   printBuildResult(output, result);
   return result.success ? 0 : 1;
@@ -105,11 +171,21 @@ async function runPreviewCommand(
   runtime: CliSession,
   config: PublisherConfig,
   output: CliOutput,
-  waitForPreviewShutdown?: () => Promise<void>
+  waitForPreviewShutdown: (() => Promise<void>) | undefined,
+  json: boolean
 ): Promise<number> {
   const session = await runtime.orchestrator.preview(config);
 
-  printPreviewSession(output, session);
+  if (json) {
+    printJson(output, {
+      command: "preview",
+      success: true,
+      session
+    });
+  } else {
+    printPreviewSession(output, session);
+  }
+
   await (waitForPreviewShutdown ?? waitForTerminationSignal)();
   return 0;
 }
@@ -117,18 +193,38 @@ async function runPreviewCommand(
 async function runDeployCommand(
   orchestrator: CliOrchestrator,
   config: PublisherConfig,
-  output: CliOutput
+  output: CliOutput,
+  json: boolean
 ): Promise<number> {
   const build = await orchestrator.build(config);
 
-  printBuildResult(output, build);
-
   if (!build.success) {
+    if (json) {
+      printJson(output, {
+        command: "deploy",
+        success: false,
+        build
+      });
+    } else {
+      printBuildResult(output, build);
+    }
+
     return 1;
   }
 
   const deploy = await orchestrator.deployFromBuild(build, config);
 
+  if (json) {
+    printJson(output, {
+      command: "deploy",
+      success: deploy.success,
+      build,
+      deploy
+    });
+    return deploy.success ? 0 : 1;
+  }
+
+  printBuildResult(output, build);
   printDeployResult(output, deploy);
   return deploy.success ? 0 : 1;
 }
@@ -213,12 +309,12 @@ function createConfigSourceMessage(configPath: string | undefined, vaultRoot: st
 
 function createHelpText(): string {
   return [
-    `publisher-cli <${supportedCommands.join("|")}> [--config <path>] [--vault-root <path>]`,
+    `publisher-cli <${supportedCommands.join("|")}> [--config <path>] [--vault-root <path>] [--json]`,
     "",
     "Examples:",
     "  publisher-cli scan --vault-root ./test_vault/hw",
     "  publisher-cli build --config ./osp.config.json",
-    "  publisher-cli preview --vault-root ./my-vault",
+    "  publisher-cli preview --vault-root ./my-vault --static-preview",
     "  publisher-cli deploy --config ./publisher.config.json"
   ].join("\n");
 }
@@ -244,10 +340,6 @@ function waitForTerminationSignal(): Promise<void> {
   });
 }
 
-const isDirectExecution =
-  process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-
-if (isDirectExecution) {
-  const exitCode = await runCli(process.argv.slice(2));
-  process.exitCode = exitCode;
+function printJson(output: CliOutput, payload: CliJsonResult): void {
+  output.log(JSON.stringify(payload));
 }

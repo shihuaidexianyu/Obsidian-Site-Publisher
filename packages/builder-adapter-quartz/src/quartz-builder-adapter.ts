@@ -1,7 +1,9 @@
 import { createRequire } from "node:module";
+import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { access, readFile } from "node:fs/promises";
 
 import type { BuildLogEntry, BuildResult, PreviewSession, PreparedWorkspace, PublisherConfig } from "@osp/shared";
 
@@ -13,10 +15,11 @@ type QuartzBuilderAdapterOptions = {
   previewReadinessTimeoutMs?: number;
   previewWsPort?: number;
   quartzPackageRoot?: string;
+  preferStaticPreview?: boolean;
 };
 
 type PreviewProcessRecord = {
-  child: ReturnType<typeof spawn>;
+  stop(): Promise<void>;
   logs: BuildLogEntry[];
 };
 
@@ -70,8 +73,43 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
     await this.stopPreview(workspace.rootDir);
 
     const port = this.options.previewPort ?? defaultPreviewPort;
-    const wsPort = this.options.previewWsPort ?? defaultPreviewWsPort;
     const logs: BuildLogEntry[] = [];
+
+    if (this.options.preferStaticPreview === true) {
+      await ensurePreviewBuildReady({
+        bootstrapCliPath: this.getBootstrapCliPath(workspace),
+        cwd: workspace.rootDir,
+        logs,
+        quartzPackageRoot,
+        workspace
+      });
+
+      const server = await startStaticPreviewServer(workspace.outputDir, port);
+
+      this.previewProcesses.set(workspace.rootDir, {
+        logs,
+        stop: async () => {
+          await new Promise<void>((resolve, reject) => {
+            server.close((error) => {
+              if (error !== undefined) {
+                reject(error);
+                return;
+              }
+
+              resolve();
+            });
+          });
+        }
+      });
+
+      return {
+        url: `http://localhost:${port}`,
+        workspaceRoot: workspace.rootDir,
+        startedAt: new Date().toISOString()
+      };
+    }
+
+    const wsPort = this.options.previewWsPort ?? defaultPreviewWsPort;
     const child = spawn(
       process.execPath,
       [this.getBootstrapCliPath(workspace), ...this.createPreviewArgs(workspace, port, wsPort)],
@@ -101,8 +139,17 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
     }
 
     this.previewProcesses.set(workspace.rootDir, {
-      child,
-      logs
+      logs,
+      stop: async () => {
+        if (child.killed || child.exitCode !== null) {
+          return;
+        }
+
+        const exitPromise = onceProcessExit(child);
+
+        child.kill();
+        await Promise.race([exitPromise, delay(5_000)]);
+      }
     });
 
     return {
@@ -219,6 +266,110 @@ async function runQuartzCommand(input: {
   };
 }
 
+async function ensurePreviewBuildReady(input: {
+  bootstrapCliPath: string;
+  cwd: string;
+  logs: BuildLogEntry[];
+  quartzPackageRoot: string;
+  workspace: PreparedWorkspace;
+}): Promise<void> {
+  const execution = await runQuartzCommand({
+    args: [
+      "build",
+      "--directory",
+      toPosixRelativePath(input.workspace.rootDir, input.workspace.contentDir),
+      "--output",
+      toPosixRelativePath(input.workspace.rootDir, input.workspace.outputDir)
+    ],
+    bootstrapCliPath: input.bootstrapCliPath,
+    cwd: input.cwd,
+    quartzPackageRoot: input.quartzPackageRoot
+  });
+
+  input.logs.push(...execution.logs);
+
+  if (execution.exitCode !== 0) {
+    throw new Error(createPreviewBuildFailureMessage(execution.logs));
+  }
+}
+
+async function startStaticPreviewServer(outputDir: string, port: number): Promise<http.Server> {
+  const server = http.createServer(async (request, response) => {
+    try {
+      const resolvedPath = await resolvePreviewRequestPath(outputDir, request.url ?? "/");
+      const body = await readFile(resolvedPath);
+
+      response.writeHead(200, {
+        "Content-Type": getContentType(resolvedPath)
+      });
+      response.end(body);
+    } catch {
+      response.writeHead(404, {
+        "Content-Type": "text/plain; charset=utf-8"
+      });
+      response.end("Not Found");
+    }
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", () => {
+      resolve();
+    });
+  });
+
+  return server;
+}
+
+async function resolvePreviewRequestPath(outputDir: string, requestUrl: string): Promise<string> {
+  const requestedPath = decodeURIComponent((requestUrl.split("?")[0] ?? "/").replace(/\\/g, "/"));
+  const normalizedPath = requestedPath.startsWith("/") ? requestedPath : `/${requestedPath}`;
+  const candidatePaths = normalizedPath.endsWith("/")
+    ? [path.join(outputDir, normalizedPath, "index.html"), path.join(outputDir, `${normalizedPath.slice(0, -1)}.html`)]
+    : [
+        path.join(outputDir, normalizedPath),
+        path.join(outputDir, `${normalizedPath}.html`),
+        path.join(outputDir, normalizedPath, "index.html")
+      ];
+
+  for (const candidatePath of candidatePaths) {
+    try {
+      await access(candidatePath);
+      return candidatePath;
+    } catch {
+      // Try the next preview path candidate.
+    }
+  }
+
+  throw new Error(`Preview path not found for ${requestUrl}.`);
+}
+
+function getContentType(filePath: string): string {
+  switch (path.extname(filePath).toLowerCase()) {
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".js":
+      return "text/javascript; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    case ".xml":
+      return "application/xml; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    default:
+      return "application/octet-stream";
+  }
+}
+
 function attachProcessLogs(child: ReturnType<typeof spawn>, logs: BuildLogEntry[]): void {
   child.stdout?.setEncoding("utf8");
   child.stderr?.setEncoding("utf8");
@@ -326,6 +477,16 @@ function createPreviewFailureMessage(error: unknown, logs: BuildLogEntry[]): str
   return `${baseMessage} Last Quartz log: ${lastLog}`;
 }
 
+function createPreviewBuildFailureMessage(logs: BuildLogEntry[]): string {
+  const lastErrorLog = [...logs].reverse().find((log) => log.level === "error")?.message;
+
+  if (lastErrorLog === undefined) {
+    return "Quartz preview build failed before the static preview server could start.";
+  }
+
+  return `Quartz preview build failed before the static preview server could start. Last Quartz log: ${lastErrorLog}`;
+}
+
 async function stopPreviewProcess(
   previewProcesses: Map<string, PreviewProcessRecord>,
   workspaceRoot: string
@@ -336,18 +497,7 @@ async function stopPreviewProcess(
     return;
   }
 
-  const { child } = record;
-
-  if (child.killed || child.exitCode !== null) {
-    previewProcesses.delete(workspaceRoot);
-    return;
-  }
-
-  const exitPromise = onceProcessExit(child);
-
-  child.kill();
-
-  await Promise.race([exitPromise, delay(5_000)]);
+  await record.stop();
   previewProcesses.delete(workspaceRoot);
 }
 

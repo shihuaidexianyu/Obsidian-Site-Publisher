@@ -45,6 +45,24 @@ await build({
   }
 });
 
+await build({
+  bundle: true,
+  entryPoints: [path.join(workspaceRoot, "apps", "publisher-cli", "src", "standalone.ts")],
+  format: "cjs",
+  logLevel: "info",
+  outfile: path.join(pluginReleaseDir, "cli.js"),
+  platform: "node",
+  sourcemap: false,
+  target: "es2020",
+  treeShaking: true,
+  banner: {
+    js: "/* Obsidian Site Publisher bundled CLI */"
+  },
+  define: {
+    "process.env.NODE_ENV": JSON.stringify("production")
+  }
+});
+
 await bundleQuartzRuntime();
 await cp(manifestPath, path.join(pluginReleaseDir, "manifest.json"), { force: true });
 await writeFile(

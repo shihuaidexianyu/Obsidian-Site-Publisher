@@ -11,6 +11,9 @@ export type CliCommand = (typeof supportedCommands)[number];
 export type CliOptions = {
   configPath?: string;
   vaultRoot?: string;
+  json: boolean;
+  quartzPackageRoot?: string;
+  preferStaticPreview: boolean;
 };
 
 export type ParsedCliArguments =
@@ -52,7 +55,10 @@ export function parseCliArguments(argv: string[]): ParsedCliArguments {
     };
   }
 
-  const options: CliOptions = {};
+  const options: CliOptions = {
+    json: false,
+    preferStaticPreview: false
+  };
 
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index];
@@ -78,6 +84,28 @@ export function parseCliArguments(argv: string[]): ParsedCliArguments {
 
       options.vaultRoot = value;
       index += 1;
+      continue;
+    }
+
+    if (token === "--json") {
+      options.json = true;
+      continue;
+    }
+
+    if (token === "--quartz-package-root") {
+      const value = rest[index + 1];
+
+      if (value === undefined) {
+        return { kind: "error", message: "Missing value for --quartz-package-root." };
+      }
+
+      options.quartzPackageRoot = value;
+      index += 1;
+      continue;
+    }
+
+    if (token === "--static-preview") {
+      options.preferStaticPreview = true;
       continue;
     }
 

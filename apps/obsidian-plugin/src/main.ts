@@ -1,6 +1,6 @@
 import { FileSystemAdapter, Notice, Plugin, PluginSettingTab, Setting, type WorkspaceLeaf } from "obsidian";
 
-import { createBundledPluginRuntimeFactory } from "./bundled-runtime.js";
+import { createBundledPluginCliBackendFactory } from "./bundled-runtime.js";
 import { PluginCommandController } from "./plugin-controller.js";
 import { BuildLogView, BUILD_LOG_VIEW_TYPE, IssueListView, ISSUE_LIST_VIEW_TYPE } from "./plugin-views.js";
 import { pluginManifest, PublisherPluginShell } from "./plugin-shell.js";
@@ -30,7 +30,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   public override async onload(): Promise<void> {
     const vaultRoot = resolveVaultRoot(this);
 
-    this.shell = new PublisherPluginShell(createBundledPluginRuntimeFactory(vaultRoot, {
+    this.shell = new PublisherPluginShell(createBundledPluginCliBackendFactory(vaultRoot, {
       dir: this.manifest.dir,
       id: this.manifest.id
     }));

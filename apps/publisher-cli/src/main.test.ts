@@ -149,6 +149,48 @@ describe("runCli", () => {
     expect(waitForPreviewShutdown).toHaveBeenCalledOnce();
     expect(output.logs.join("\n")).toContain("Preview ready at http://localhost:8080");
   });
+
+  it("prints machine-readable JSON when --json is used", async () => {
+    const output = createCapturedOutput();
+    const runtime = createStubRuntime();
+
+    const exitCode = await runCli(["build", "--vault-root", "./vault", "--json"], {
+      cwd: "c:\\workspace",
+      output,
+      createRuntime: () => runtime
+    });
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(output.logs.at(-1) ?? "{}")).toMatchObject({
+      command: "build",
+      success: true,
+      result: {
+        outputDir: "/workspace/dist"
+      }
+    });
+  });
+
+  it("passes Quartz builder options into the runtime factory", async () => {
+    const output = createCapturedOutput();
+    const runtime = createStubRuntime();
+    const createRuntime = vi.fn(() => runtime);
+
+    const exitCode = await runCli(
+      ["preview", "--vault-root", "./vault", "--static-preview", "--quartz-package-root", "./runtime/quartz"],
+      {
+        cwd: "c:\\workspace",
+        output,
+        createRuntime,
+        waitForPreviewShutdown: vi.fn(async () => {})
+      }
+    );
+
+    expect(exitCode).toBe(0);
+    expect(createRuntime).toHaveBeenCalledWith({
+      quartzPackageRoot: path.resolve("c:\\workspace", "runtime/quartz"),
+      preferStaticPreview: true
+    });
+  });
 });
 
 function createStubRuntime(options: {
