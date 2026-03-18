@@ -20,7 +20,6 @@ type PreviewProcessRecord = {
   logs: BuildLogEntry[];
 };
 
-const require = createRequire(import.meta.url);
 const defaultPreviewPort = 8080;
 const defaultPreviewReadinessTimeoutMs = 20_000;
 const defaultPreviewWsPort = 3001;
@@ -147,7 +146,25 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
 }
 
 function resolveQuartzPackageRoot(): string {
-  return path.dirname(require.resolve("@jackyzha0/quartz/package.json"));
+  return path.dirname(resolveNodeRequire().resolve("@jackyzha0/quartz/package.json"));
+}
+
+function resolveNodeRequire(): NodeJS.Require {
+  const nativeRequire = readNativeRequire();
+
+  if (nativeRequire !== undefined) {
+    return nativeRequire;
+  }
+
+  return createRequire(import.meta.url);
+}
+
+function readNativeRequire(): NodeJS.Require | undefined {
+  try {
+    return Function("return typeof require === 'function' ? require : undefined;")() as NodeJS.Require | undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function runQuartzCommand(input: {

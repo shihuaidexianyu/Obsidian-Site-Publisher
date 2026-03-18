@@ -10,6 +10,7 @@ coverage/
 test_valut/
 test_vault/hw
 .generated/
+.obsidian-plugin-build/
 .tmp-*/
 .tmp-local-build-smoke/
 .tmp-hw-view-config.json
