@@ -35,13 +35,13 @@ export class PluginCommandController {
     try {
       const result = await this.shell.runCommand(command, this.getConfig());
 
-      this.host.setStatus(result.statusMessage);
+      this.host.setStatus(createStatusBarMessage(result));
       this.host.showNotice(result.statusMessage);
       await this.syncViews(result);
     } catch (error) {
       const message = formatPluginCommandError(command, error);
 
-      this.host.setStatus(message);
+      this.host.setStatus(createErrorStatusBarMessage(command));
       this.host.showNotice(message);
       this.host.refreshViews();
     }
@@ -75,4 +75,33 @@ function formatPluginCommandError(command: PluginCommand, error: unknown): strin
   }
 
   return `${commandLabel}失败：发生了未知错误。`;
+}
+
+function createStatusBarMessage(result: PluginCommandResult): string {
+  switch (result.command) {
+    case "preview":
+      return "站点发布：预览已启动";
+    case "build":
+      return result.result.success ? "站点发布：构建完成" : "站点发布：构建失败";
+    case "publish":
+      if (!result.build.success) {
+        return "站点发布：发布已停止";
+      }
+
+      return result.deploy?.success === false ? "站点发布：发布失败" : "站点发布：发布完成";
+    case "issues":
+      return "站点发布：检查完成";
+  }
+}
+
+function createErrorStatusBarMessage(command: PluginCommand): string {
+  const commandLabel = command === "preview"
+    ? "预览"
+    : command === "build"
+      ? "构建"
+      : command === "publish"
+        ? "发布"
+        : "检查";
+
+  return `站点发布：${commandLabel}失败`;
 }

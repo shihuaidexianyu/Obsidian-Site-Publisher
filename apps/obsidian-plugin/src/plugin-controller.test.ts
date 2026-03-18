@@ -25,7 +25,7 @@ describe("PluginCommandController", () => {
     await controller.runCommand("preview");
 
     expect(shell.runCommand).toHaveBeenCalledWith("preview", createConfig("/vault"));
-    expect(host.setStatus).toHaveBeenCalledWith("站点预览已启动：http://localhost:8080");
+    expect(host.setStatus).toHaveBeenCalledWith("站点发布：预览已启动");
     expect(host.showNotice).toHaveBeenCalledWith("站点预览已启动：http://localhost:8080");
     expect(host.refreshViews).toHaveBeenCalledOnce();
   });
@@ -42,9 +42,7 @@ describe("PluginCommandController", () => {
 
     await controller.runCommand("preview");
 
-    expect(host.setStatus).toHaveBeenCalledWith(
-      "预览失败：Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
-    );
+    expect(host.setStatus).toHaveBeenCalledWith("站点发布：预览失败");
     expect(host.showNotice).toHaveBeenCalledWith(
       "预览失败：Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
     );
