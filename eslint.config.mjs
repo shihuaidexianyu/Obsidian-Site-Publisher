@@ -4,7 +4,14 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["**/*.d.ts", "**/.generated/**", "**/dist/**", "**/node_modules/**"]
+    ignores: [
+      "**/*.d.ts",
+      "**/.generated/**",
+      "**/.osp/**",
+      "**/dist/**",
+      "**/node_modules/**",
+      ".tmp-*/**"
+    ]
   },
   {
     files: ["**/*.ts"],
