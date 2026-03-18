@@ -32,15 +32,15 @@ importers:
       vitest:
         specifier: ^3.1.1
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.2)
+      yazl:
+        specifier: ^3.3.1
+        version: 3.3.1
       zod:
         specifier: ^3.24.2
         version: 3.25.76
 
   apps/obsidian-plugin:
     dependencies:
-      '@osp/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@osp/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -65,7 +65,7 @@ importers:
     dependencies:
       '@jackyzha0/quartz':
         specifier: github:jackyzha0/quartz#v4
-        version: git+https://git@github.com:jackyzha0/quartz.git#59b58076016c5e5f09f16ab0395fed02e2ebb72e(esbuild@0.27.4)(sass-embedded@1.98.0)
+        version: https://codeload.github.com/jackyzha0/quartz/tar.gz/59b58076016c5e5f09f16ab0395fed02e2ebb72e(esbuild@0.27.4)(sass-embedded@1.98.0)
       '@osp/shared':
         specifier: workspace:*
         version: link:../shared
@@ -530,8 +530,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@jackyzha0/quartz@git+https://git@github.com:jackyzha0/quartz.git#59b58076016c5e5f09f16ab0395fed02e2ebb72e':
-    resolution: {commit: 59b58076016c5e5f09f16ab0395fed02e2ebb72e, repo: git@github.com:jackyzha0/quartz.git, type: git}
+  '@jackyzha0/quartz@https://codeload.github.com/jackyzha0/quartz/tar.gz/59b58076016c5e5f09f16ab0395fed02e2ebb72e':
+    resolution: {tarball: https://codeload.github.com/jackyzha0/quartz/tar.gz/59b58076016c5e5f09f16ab0395fed02e2ebb72e}
     version: 4.5.2
     engines: {node: '>=22', npm: '>=10.9.2'}
     hasBin: true
@@ -1195,6 +1195,10 @@ packages:
   braces@3.0.3:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
+
+  buffer-crc32@1.0.0:
+    resolution: {integrity: sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==}
+    engines: {node: '>=8.0.0'}
 
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
@@ -2960,6 +2964,9 @@ packages:
     resolution: {integrity: sha512-4UEqdc2RYGHZc7Doyqkrqiln3p9X2DZVxaGbwhn2pi7MrRagKaOcIKe8L3OxYcbhXLgLFUS3zAYuQjKBQgmuNg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=23}
 
+  yazl@3.3.1:
+    resolution: {integrity: sha512-BbETDVWG+VcMUle37k5Fqp//7SDOK2/1+T7X8TD96M3D9G8jK5VLUdQVdVjGi8im7FGkazX7kk5hkU8X4L5Bng==}
+
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
@@ -3278,7 +3285,7 @@ snapshots:
   '@img/sharp-win32-x64@0.34.5':
     optional: true
 
-  '@jackyzha0/quartz@git+https://git@github.com:jackyzha0/quartz.git#59b58076016c5e5f09f16ab0395fed02e2ebb72e(esbuild@0.27.4)(sass-embedded@1.98.0)':
+  '@jackyzha0/quartz@https://codeload.github.com/jackyzha0/quartz/tar.gz/59b58076016c5e5f09f16ab0395fed02e2ebb72e(esbuild@0.27.4)(sass-embedded@1.98.0)':
     dependencies:
       '@clack/prompts': 0.11.0
       '@floating-ui/dom': 1.7.6
@@ -3929,6 +3936,8 @@ snapshots:
   braces@3.0.3:
     dependencies:
       fill-range: 7.1.1
+
+  buffer-crc32@1.0.0: {}
 
   buffer-from@1.1.2: {}
 
@@ -6116,6 +6125,10 @@ snapshots:
       string-width: 7.2.0
       y18n: 5.0.8
       yargs-parser: 22.0.0
+
+  yazl@3.3.1:
+    dependencies:
+      buffer-crc32: 1.0.0
 
   yocto-queue@0.1.0: {}
 

@@ -9,6 +9,7 @@ export default [
       "**/.generated/**",
       "**/.obsidian-plugin-build/**",
       "**/.osp/**",
+      "**/.release/**",
       "**/dist/**",
       "**/node_modules/**",
       ".tmp-*/**"

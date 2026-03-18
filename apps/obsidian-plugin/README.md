@@ -33,57 +33,46 @@
 
 ## 安装产物
 
+推荐通过发行包安装，而不是手工拼装插件目录。
+
 在仓库根目录执行：
 
 ```bash
-corepack pnpm build:obsidian-plugin
+corepack pnpm build:release
 ```
 
-可安装插件会生成到：
+会生成：
 
-```text
-.obsidian-plugin-build/obsidian-site-publisher/
-```
+- 插件包：`.release/v<version>/artifacts/obsidian-site-publisher-plugin-<version>.zip`
+- 跨平台 CLI 包：`.release/v<version>/artifacts/publisher-cli-portable-<version>.zip`
 
-需要复制到 Obsidian 的文件只有：
-
-- `main.js`
-- `manifest.json`
-- `versions.json`
-
-目标目录：
+插件安装目录仍然是：
 
 ```text
 <你的Vault>/.obsidian/plugins/obsidian-site-publisher/
 ```
 
+插件包中需要复制的文件仍然只有：
+
+- `main.js`
+- `manifest.json`
+- `versions.json`
+
 ## 依赖的外部 CLI
 
 这个插件不会把 CLI 打包进插件目录。
 
-你需要单独准备 `publisher-cli`：
-
-```bash
-corepack pnpm build
-```
-
-常见入口路径：
-
-```text
-<repo>/apps/publisher-cli/dist/main.js
-```
-
-然后在插件设置中填写：
+CLI 建议单独安装，然后在插件设置中填写：
 
 - `CLI 可执行文件路径`
 
-在 Windows 上，一个常见例子是：
+不同平台推荐选择的入口：
 
-```text
-C:\Users\<用户名>\path\to\Obsidian Site Publisher\apps\publisher-cli\dist\main.js
-```
+- Windows：`publisher-cli.cmd`
+- macOS：`publisher-cli`
+- Linux：`publisher-cli`
 
-如果系统 `PATH` 里已经有 `publisher-cli`，也可以不填。
+CLI 包当前依赖本机 Node.js 20+。
 
 ## 设置项
 

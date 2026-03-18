@@ -7,10 +7,8 @@ dist/
 .DS_Store
 coverage/
 
-test_valut/
-test_vault/hw
+
 .generated/
 .obsidian-plugin-build/
+.release/
 .tmp-*/
-.tmp-local-build-smoke/
-.tmp-hw-view-config.json
