@@ -26,22 +26,22 @@ const defaultPreviewWsPort = 3001;
 
 export class QuartzBuilderAdapter implements BuilderAdapter {
   private readonly previewProcesses = new Map<string, PreviewProcessRecord>();
-  private readonly quartzPackageRoot: string;
+  private quartzPackageRoot: string | undefined;
 
-  public constructor(private readonly options: QuartzBuilderAdapterOptions = {}) {
-    this.quartzPackageRoot = options.quartzPackageRoot ?? resolveQuartzPackageRoot();
-  }
+  public constructor(private readonly options: QuartzBuilderAdapterOptions = {}) {}
 
   public async build(workspace: PreparedWorkspace, config: PublisherConfig): Promise<BuildResult> {
     const startedAt = Date.now();
 
     try {
-      await ensureQuartzWorkspaceRuntime(workspace, config, this.quartzPackageRoot);
+      const quartzPackageRoot = this.getQuartzPackageRoot();
+
+      await ensureQuartzWorkspaceRuntime(workspace, config, quartzPackageRoot);
       const execution = await runQuartzCommand({
         args: this.createBuildArgs(workspace),
         bootstrapCliPath: this.getBootstrapCliPath(workspace),
         cwd: workspace.rootDir,
-        quartzPackageRoot: this.quartzPackageRoot
+        quartzPackageRoot
       });
 
       return {
@@ -64,7 +64,9 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
   }
 
   public async preview(workspace: PreparedWorkspace, config: PublisherConfig): Promise<PreviewSession> {
-    await ensureQuartzWorkspaceRuntime(workspace, config, this.quartzPackageRoot);
+    const quartzPackageRoot = this.getQuartzPackageRoot();
+
+    await ensureQuartzWorkspaceRuntime(workspace, config, quartzPackageRoot);
     await this.stopPreview(workspace.rootDir);
 
     const port = this.options.previewPort ?? defaultPreviewPort;
@@ -143,10 +145,23 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
   private getBootstrapCliPath(workspace: PreparedWorkspace): string {
     return path.join(workspace.rootDir, "quartz", "bootstrap-cli.mjs");
   }
+
+  private getQuartzPackageRoot(): string {
+    if (this.quartzPackageRoot !== undefined) {
+      return this.quartzPackageRoot;
+    }
+
+    this.quartzPackageRoot = this.options.quartzPackageRoot ?? resolveQuartzPackageRoot();
+    return this.quartzPackageRoot;
+  }
 }
 
 function resolveQuartzPackageRoot(): string {
-  return path.dirname(resolveNodeRequire().resolve("@jackyzha0/quartz/package.json"));
+  try {
+    return path.dirname(resolveNodeRequire().resolve("@jackyzha0/quartz/package.json"));
+  } catch (error) {
+    throw new Error(createQuartzRuntimeResolutionMessage(error));
+  }
 }
 
 function resolveNodeRequire(): NodeJS.Require {
@@ -278,6 +293,17 @@ function createErrorLog(error: unknown): BuildLogEntry {
     message: error instanceof Error ? error.message : "Quartz build failed with an unknown error.",
     timestamp: new Date().toISOString()
   };
+}
+
+function createQuartzRuntimeResolutionMessage(error: unknown): string {
+  const details = error instanceof Error ? error.message : "Unknown module resolution failure.";
+
+  return [
+    "Quartz runtime could not be resolved.",
+    "The current environment does not provide @jackyzha0/quartz as a loadable package.",
+    "If you are running the packaged Obsidian plugin, the install bundle is not self-contained for build/preview/publish yet.",
+    `Details: ${details}`
+  ].join(" ");
 }
 
 function createPreviewFailureMessage(error: unknown, logs: BuildLogEntry[]): string {
