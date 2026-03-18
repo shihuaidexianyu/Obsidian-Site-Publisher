@@ -25,6 +25,7 @@ Real pipeline status today:
 - scan / diagnose / stage / build / preview are wired through the default runtime
 - `publisher-cli` is a standalone program that calls the shared `@osp/core` orchestration path
 - the Obsidian plugin now shells out to an external `publisher-cli`, which keeps Quartz/build work out of the renderer process
+- staging also applies a small compatibility pass for math-heavy notes so common Obsidian-authored delimiters are normalized before Quartz/KaTeX sees them
 - deploy now has a real `local-export` target that copies a successful build into a dedicated output directory
 - deploy also supports `git-branch`, which commits the built site into a dedicated branch such as `gh-pages`
 - deploy also supports `github-pages`, including external repository URLs such as `username.github.io`
