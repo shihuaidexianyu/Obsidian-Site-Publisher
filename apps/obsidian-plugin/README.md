@@ -43,8 +43,7 @@ corepack pnpm build:release
 
 会生成：
 
-- 插件包：`.release/v<version>/artifacts/obsidian-site-publisher-plugin-<version>.zip`
-- 跨平台 CLI 包：`.release/v<version>/artifacts/publisher-cli-portable-<version>.zip`
+- 当前平台的一体化插件包：`.release/v<version>/artifacts/obsidian-site-publisher-<platform>-<arch>-<version>.zip`
 
 插件安装目录仍然是：
 
@@ -52,27 +51,25 @@ corepack pnpm build:release
 <你的Vault>/.obsidian/plugins/obsidian-site-publisher/
 ```
 
-插件包中需要复制的文件仍然只有：
+插件包解压后，整个 `obsidian-site-publisher/` 目录都应复制进去。目录中通常包含：
 
 - `main.js`
 - `manifest.json`
 - `versions.json`
+- `bin/publisher-cli(.exe)`
+- `bin/runtime/app/`
 
 ## 依赖的外部 CLI
 
-这个插件不会把 CLI 打包进插件目录。
+通过 `build:release` 生成的一体化插件包，已经把平台对应的原生 CLI 一起放进插件目录。
 
-CLI 建议单独安装，然后在插件设置中填写：
+默认情况下，插件会按以下顺序查找 CLI：
 
-- `CLI 可执行文件路径`
+1. 设置页中手动填写的 `CLI 可执行文件路径`
+2. 插件目录下的 `bin/publisher-cli(.exe)`
+3. 系统 `PATH` 中的 `publisher-cli`
 
-不同平台推荐选择的入口：
-
-- Windows：`publisher-cli.cmd`
-- macOS：`publisher-cli`
-- Linux：`publisher-cli`
-
-CLI 包当前依赖本机 Node.js 20+。
+因此，对最终用户来说，通常不需要额外安装 CLI，也不需要本机预装 Node.js。
 
 ## 设置项
 

@@ -33,6 +33,7 @@ type CliBackendOptions = {
   cliCommand: string;
   logDirectory?: string;
   previewPort?: number;
+  quartzPackageRoot?: string;
   tempRoot?: string;
 };
 type CliChildProcess = ReturnType<typeof spawn>;
@@ -213,7 +214,8 @@ export class CliPluginBackend implements PluginExecutionBackend {
       configPath,
       "--json",
       ...(this.options.logDirectory === undefined ? [] : ["--log-dir", this.options.logDirectory]),
-      ...(this.options.previewPort === undefined ? [] : ["--preview-port", `${this.options.previewPort}`])
+      ...(this.options.previewPort === undefined ? [] : ["--preview-port", `${this.options.previewPort}`]),
+      ...(this.options.quartzPackageRoot === undefined ? [] : ["--quartz-package-root", this.options.quartzPackageRoot])
     ];
   }
 

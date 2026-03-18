@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { FileSystemAdapter, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
 
 import { createExternalCliBackendFactory } from "./external-cli.js";
@@ -28,8 +30,9 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
 
   public override async onload(): Promise<void> {
     const vaultRoot = resolveVaultRoot(this);
+    const pluginRoot = resolvePluginRoot(this, vaultRoot);
 
-    this.shell = new PublisherPluginShell(createExternalCliBackendFactory(vaultRoot, () => this.settings.cli));
+    this.shell = new PublisherPluginShell(createExternalCliBackendFactory(vaultRoot, pluginRoot, () => this.settings.cli));
     const loadedSettings = await loadPluginSettings(this, this.shell, vaultRoot);
 
     this.settings = loadedSettings;
@@ -152,6 +155,10 @@ function resolveVaultRoot(plugin: Plugin): string {
   }
 
   throw new Error("Obsidian Site Publisher requires FileSystemAdapter and desktop vault access.");
+}
+
+function resolvePluginRoot(plugin: Plugin, vaultRoot: string): string {
+  return path.join(vaultRoot, plugin.app.vault.configDir, "plugins", pluginManifest.id);
 }
 
 function createRunningStatusLabel(command: "preview" | "build" | "publish" | "issues"): string {
