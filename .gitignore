@@ -10,4 +10,5 @@ coverage/
 test_valut/
 test_vault/hw
 .generated/
-.tmp-build-site.ts
+.tmp-local-build-smoke/
+.tmp-hw-view-config.json
