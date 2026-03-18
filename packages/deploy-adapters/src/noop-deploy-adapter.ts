@@ -1,6 +1,6 @@
 import type { BuildResult, DeployResult, PublisherConfig } from "@osp/shared";
 
-import type { DeployAdapter } from "./contracts";
+import type { DeployAdapter } from "./contracts.js";
 
 export class NoopDeployAdapter implements DeployAdapter {
   public async deploy(build: BuildResult, config: PublisherConfig): Promise<DeployResult> {

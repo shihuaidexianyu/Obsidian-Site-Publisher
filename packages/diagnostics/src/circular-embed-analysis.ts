@@ -1,6 +1,6 @@
 import type { BuildIssue, NoteRecord, VaultManifest } from "@osp/shared";
 
-import { createNoteIndex, normalizePath, resolveNoteTarget, splitLinkTarget } from "./reference-resolution";
+import { createNoteIndex, normalizePath, resolveNoteTarget, splitLinkTarget } from "./reference-resolution.js";
 
 export function analyzeCircularEmbeds(manifest: VaultManifest, publishedNotePaths?: ReadonlySet<string>): BuildIssue[] {
   const noteIndex = createNoteIndex(manifest.notes);

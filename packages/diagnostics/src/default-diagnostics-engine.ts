@@ -1,12 +1,12 @@
 import { createPublishedNotePathSet, selectPublishedNotes } from "@osp/shared";
 import type { BuildIssue, PublisherConfig, UnsupportedObjectRecord, VaultManifest } from "@osp/shared";
 
-import type { DiagnosticsEngine } from "./contracts";
-import { analyzeBrokenLinks } from "./broken-link-analysis";
-import { analyzeCircularEmbeds } from "./circular-embed-analysis";
-import { analyzeInvalidFrontmatter } from "./invalid-frontmatter-analysis";
-import { analyzeMissingAssets } from "./missing-asset-analysis";
-import { analyzeUnpublishedReferences } from "./unpublished-reference-analysis";
+import type { DiagnosticsEngine } from "./contracts.js";
+import { analyzeBrokenLinks } from "./broken-link-analysis.js";
+import { analyzeCircularEmbeds } from "./circular-embed-analysis.js";
+import { analyzeInvalidFrontmatter } from "./invalid-frontmatter-analysis.js";
+import { analyzeMissingAssets } from "./missing-asset-analysis.js";
+import { analyzeUnpublishedReferences } from "./unpublished-reference-analysis.js";
 
 export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
   public analyze(manifest: VaultManifest, config: PublisherConfig): BuildIssue[] {

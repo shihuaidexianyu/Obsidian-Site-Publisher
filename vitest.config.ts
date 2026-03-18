@@ -6,6 +6,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@osp/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
+      "@osp/core": path.resolve(__dirname, "packages/core/src/index.ts"),
       "@osp/parser": path.resolve(__dirname, "packages/parser/src/index.ts"),
       "@osp/diagnostics": path.resolve(__dirname, "packages/diagnostics/src/index.ts"),
       "@osp/staging": path.resolve(__dirname, "packages/staging/src/index.ts"),
@@ -14,6 +15,6 @@ export default defineConfig({
     }
   },
   test: {
-    include: ["packages/**/*.test.ts"]
+    include: ["packages/**/*.test.ts", "apps/**/*.test.ts"]
   }
 });

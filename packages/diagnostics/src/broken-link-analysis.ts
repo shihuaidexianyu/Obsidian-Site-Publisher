@@ -1,7 +1,14 @@
 import type { BuildIssue, LinkRef, NoteRecord, VaultManifest } from "@osp/shared";
 
-import type { NoteIndex } from "./reference-resolution";
-import { createNoteIndex, isAssetTarget, normalizePath, resolveNoteTarget, slugifyAnchor, splitLinkTarget } from "./reference-resolution";
+import type { NoteIndex } from "./reference-resolution.js";
+import {
+  createNoteIndex,
+  isAssetTarget,
+  normalizePath,
+  resolveNoteTarget,
+  slugifyAnchor,
+  splitLinkTarget
+} from "./reference-resolution.js";
 
 export function analyzeBrokenLinks(manifest: VaultManifest, sourceNotePaths?: ReadonlySet<string>): BuildIssue[] {
   const noteIndex = createNoteIndex(manifest.notes);

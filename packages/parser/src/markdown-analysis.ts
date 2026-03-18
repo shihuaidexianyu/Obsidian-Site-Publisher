@@ -1,7 +1,7 @@
 import type { AssetRef, EmbedRef, HeadingRecord, LinkRef, NoteRecord } from "@osp/shared";
 
-import { stripLeadingFrontmatter } from "./frontmatter";
-import { slugify } from "./slug";
+import { stripLeadingFrontmatter } from "./frontmatter.js";
+import { slugify } from "./slug.js";
 
 type MarkdownAnalysis = Pick<NoteRecord, "assets" | "blockIds" | "embeds" | "headings" | "links">;
 

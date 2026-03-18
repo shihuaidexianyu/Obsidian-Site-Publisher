@@ -1,4 +1,4 @@
-import type { PublisherError } from "./types";
+import type { PublisherError } from "./types.js";
 
 export function createPublisherError(
   code: string,

@@ -1,4 +1,5 @@
 import { access, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
@@ -41,16 +42,18 @@ describe("QuartzBuilderAdapter", () => {
     "starts a real Quartz preview server",
     async () => {
       const workspace = await createPreparedWorkspace("osp-quartz-preview-");
+      const previewPort = await getAvailablePort();
+      const previewWsPort = await getAvailablePort();
       const adapter = new QuartzBuilderAdapter({
-        previewPort: 43180,
+        previewPort,
         previewReadinessTimeoutMs: 60_000,
-        previewWsPort: 43181
+        previewWsPort
       });
 
       try {
         const session = await adapter.preview(workspace, createConfig(workspace.rootDir));
 
-        expect(session.url).toBe("http://localhost:43180");
+        expect(session.url).toBe(`http://localhost:${previewPort}`);
 
         const response = await fetch(session.url);
         const html = await response.text();
@@ -106,4 +109,29 @@ async function createPreparedWorkspace(prefix: string): Promise<PreparedWorkspac
     outputDir,
     manifestPath
   };
+}
+
+async function getAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+
+      if (address === null || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate a TCP port for Quartz preview test.")));
+        return;
+      }
+
+      server.close((closeError) => {
+        if (closeError !== undefined) {
+          reject(closeError);
+          return;
+        }
+
+        resolve(address.port);
+      });
+    });
+  });
 }

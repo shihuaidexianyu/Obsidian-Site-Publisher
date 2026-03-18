@@ -3,10 +3,10 @@ import path from "node:path";
 
 import type { AssetRef, PublisherConfig, UnsupportedObjectRecord, VaultManifest } from "@osp/shared";
 
-import type { ScanInput, ScanResult, VaultParser } from "./contracts";
-import { parseFrontmatterFields } from "./frontmatter";
-import { analyzeMarkdownContent } from "./markdown-analysis";
-import { slugify } from "./slug";
+import type { ScanInput, ScanResult, VaultParser } from "./contracts.js";
+import { parseFrontmatterFields } from "./frontmatter.js";
+import { analyzeMarkdownContent } from "./markdown-analysis.js";
+import { slugify } from "./slug.js";
 
 export class FileSystemVaultParser implements VaultParser {
   public async scanVault(input: ScanInput): Promise<ScanResult> {
@@ -135,7 +135,7 @@ function createUnsupportedObjectRecord(relativePath: string): UnsupportedObjectR
 
 function createIgnoredRelativePrefixes(config: PublisherConfig): string[] {
   // These folders are vault-local metadata or deleted content, not publishable material.
-  const prefixes = [".git", ".obsidian", ".trash", "node_modules"];
+  const prefixes = [".git", ".obsidian", ".osp", ".trash", "node_modules"];
   const relativeOutputPath = toOptionalRelativeVaultPath(config.vaultRoot, config.outputDir);
 
   if (relativeOutputPath !== undefined) {

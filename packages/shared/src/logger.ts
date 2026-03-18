@@ -1,4 +1,4 @@
-import type { BuildLogEntry } from "./types";
+import type { BuildLogEntry } from "./types.js";
 
 export interface Logger {
   entries(): BuildLogEntry[];

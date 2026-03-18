@@ -4,7 +4,7 @@ import path from "node:path";
 import { selectPublishedNotes } from "@osp/shared";
 import type { AssetRef, NoteRecord, PreparedWorkspace, VaultManifest } from "@osp/shared";
 
-import type { PrepareStagingInput, StagingService } from "./contracts";
+import type { PrepareStagingInput, StagingService } from "./contracts.js";
 
 export class FileSystemStagingService implements StagingService {
   public async prepare(input: PrepareStagingInput): Promise<PreparedWorkspace> {

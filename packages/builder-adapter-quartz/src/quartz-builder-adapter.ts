@@ -5,8 +5,8 @@ import { spawn } from "node:child_process";
 
 import type { BuildLogEntry, BuildResult, PreviewSession, PreparedWorkspace, PublisherConfig } from "@osp/shared";
 
-import type { BuilderAdapter } from "./contracts";
-import { ensureQuartzWorkspaceRuntime, readQuartzVersion } from "./quartz-runtime";
+import type { BuilderAdapter } from "./contracts.js";
+import { ensureQuartzWorkspaceRuntime, readQuartzVersion } from "./quartz-runtime.js";
 
 type QuartzBuilderAdapterOptions = {
   previewPort?: number;

@@ -1,6 +1,6 @@
 import type { BuildIssue, VaultManifest } from "@osp/shared";
 
-import { normalizePath, resolveAssetTarget } from "./reference-resolution";
+import { normalizePath, resolveAssetTarget } from "./reference-resolution.js";
 
 export function analyzeMissingAssets(manifest: VaultManifest, sourceNotePaths?: ReadonlySet<string>): BuildIssue[] {
   const availableAssets = new Set(manifest.assetFiles.map((asset) => normalizePath(asset.path)));

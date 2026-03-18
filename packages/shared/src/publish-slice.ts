@@ -1,4 +1,4 @@
-import type { NoteRecord, PublisherConfig, VaultManifest } from "./types";
+import type { NoteRecord, PublisherConfig, VaultManifest } from "./types.js";
 
 export function selectPublishedNotes(manifest: VaultManifest, config: PublisherConfig): NoteRecord[] {
   return manifest.notes.filter((note) => isNotePublished(note, config));

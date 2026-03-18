@@ -1,2 +1,2 @@
-export * from "./contracts";
-export * from "./file-system-staging-service";
+export * from "./contracts.js";
+export * from "./file-system-staging-service.js";

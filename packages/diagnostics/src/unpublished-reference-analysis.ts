@@ -1,6 +1,6 @@
 import type { BuildIssue, LinkRef, NoteRecord, VaultManifest } from "@osp/shared";
 
-import { createNoteIndex, isAssetTarget, normalizePath, resolveNoteTarget, splitLinkTarget } from "./reference-resolution";
+import { createNoteIndex, isAssetTarget, normalizePath, resolveNoteTarget, splitLinkTarget } from "./reference-resolution.js";
 
 export function analyzeUnpublishedReferences(
   manifest: VaultManifest,

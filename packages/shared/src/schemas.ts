@@ -7,7 +7,7 @@ import {
   publishModes,
   severities,
   unsupportedObjectKinds
-} from "./constants";
+} from "./constants.js";
 
 export const SourceLocationSchema = z.object({
   line: z.number().int().positive(),
