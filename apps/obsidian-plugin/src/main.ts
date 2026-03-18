@@ -1,37 +1,37 @@
 import { FileSystemAdapter, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
 
-import { createBundledPluginCliBackendFactory } from "./bundled-cli.js";
+import { createExternalCliBackendFactory } from "./external-cli.js";
 import { PluginCommandController } from "./plugin-controller.js";
 import { PublisherPluginSettingTab } from "./plugin-settings-tab.js";
 import { BuildLogView, BUILD_LOG_VIEW_TYPE, IssueListView, ISSUE_LIST_VIEW_TYPE } from "./plugin-views.js";
 import { pluginManifest, PublisherPluginShell } from "./plugin-shell.js";
-import { loadPluginSettings, savePluginSettings } from "./settings.js";
+import { loadPluginSettings, savePluginSettings, type PublisherPluginSettings } from "./settings.js";
 
 export { pluginManifest } from "./plugin-shell.js";
+export * from "./external-cli.js";
 export * from "./plugin-controller.js";
 export * from "./plugin-settings-tab.js";
 export * from "./plugin-shell.js";
-export * from "./bundled-cli.js";
 export * from "./plugin-view-model.js";
 export * from "./plugin-views.js";
 export * from "./settings.js";
 
 export default class ObsidianSitePublisherPlugin extends Plugin {
   private shell = new PublisherPluginShell();
-  private settings = this.shell.createInitialConfig("");
+  private settings: PublisherPluginSettings = {
+    config: this.shell.createInitialConfig(""),
+    cli: {}
+  };
   private statusBarEl?: HTMLElement;
   private controller?: PluginCommandController;
 
   public override async onload(): Promise<void> {
     const vaultRoot = resolveVaultRoot(this);
 
-    this.shell = new PublisherPluginShell(createBundledPluginCliBackendFactory(vaultRoot, {
-      dir: this.manifest.dir,
-      id: this.manifest.id
-    }));
+    this.shell = new PublisherPluginShell(createExternalCliBackendFactory(vaultRoot, () => this.settings.cli));
     const loadedSettings = await loadPluginSettings(this, this.shell, vaultRoot);
 
-    this.settings = loadedSettings.config;
+    this.settings = loadedSettings;
     this.registerWorkspaceViews();
     this.statusBarEl = this.addStatusBarItem();
     this.controller = new PluginCommandController(
@@ -52,11 +52,11 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
         revealBuildLogView: async () => this.revealPluginView(BUILD_LOG_VIEW_TYPE),
         refreshViews: () => this.refreshPluginViews()
       },
-      () => this.settings
+      () => this.settings.config
     );
 
     this.controller.registerCommands();
-    this.statusBarEl.setText("Obsidian Site Publisher ready.");
+    this.statusBarEl.setText("站点发布插件已就绪");
     this.addSettingTab(new PublisherPluginSettingTab(this.app, this));
   }
 
@@ -66,20 +66,22 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
     this.app.workspace.detachLeavesOfType(BUILD_LOG_VIEW_TYPE);
   }
 
-  public async updateConfig(nextConfig: typeof this.settings): Promise<void> {
-    this.settings = nextConfig;
-    await savePluginSettings(this, {
-      config: this.settings
-    });
-    this.statusBarEl?.setText("Publisher settings saved.");
+  public async updateSettings(nextSettings: PublisherPluginSettings): Promise<void> {
+    this.settings = nextSettings;
+    await savePluginSettings(this, this.settings);
+    this.statusBarEl?.setText("站点发布设置已保存");
   }
 
-  public getConfig(): typeof this.settings {
+  public getSettings(): PublisherPluginSettings {
     return this.settings;
   }
 
-  public async updateConfigWith(updater: (currentConfig: typeof this.settings) => typeof this.settings): Promise<void> {
-    await this.updateConfig(updater(this.settings));
+  public getConfig(): PublisherPluginSettings["config"] {
+    return this.settings.config;
+  }
+
+  public async updateSettingsWith(updater: (currentSettings: PublisherPluginSettings) => PublisherPluginSettings): Promise<void> {
+    await this.updateSettings(updater(this.settings));
   }
 
   private registerWorkspaceViews(): void {

@@ -12,6 +12,8 @@ export type CliOptions = {
   configPath?: string;
   vaultRoot?: string;
   json: boolean;
+  logDir?: string;
+  previewPort?: number;
   quartzPackageRoot?: string;
   preferStaticPreview: boolean;
 };
@@ -89,6 +91,36 @@ export function parseCliArguments(argv: string[]): ParsedCliArguments {
 
     if (token === "--json") {
       options.json = true;
+      continue;
+    }
+
+    if (token === "--log-dir") {
+      const value = rest[index + 1];
+
+      if (value === undefined) {
+        return { kind: "error", message: "Missing value for --log-dir." };
+      }
+
+      options.logDir = value;
+      index += 1;
+      continue;
+    }
+
+    if (token === "--preview-port") {
+      const value = rest[index + 1];
+
+      if (value === undefined) {
+        return { kind: "error", message: "Missing value for --preview-port." };
+      }
+
+      const parsedPort = Number.parseInt(value, 10);
+
+      if (!Number.isInteger(parsedPort) || parsedPort <= 0) {
+        return { kind: "error", message: "Expected --preview-port to be a positive integer." };
+      }
+
+      options.previewPort = parsedPort;
+      index += 1;
       continue;
     }
 

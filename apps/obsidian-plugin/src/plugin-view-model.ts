@@ -23,9 +23,9 @@ export type LogPanelItem = {
 
 export function createIssuePanelMeta(state: PluginExecutionState): PanelMeta {
   return {
-    title: "Publish Issues",
-    summary: createSummaryText(state, `${state.lastIssues.length} issue(s) in the latest result`),
-    emptyMessage: "Run the issues or build command to inspect publish blockers here."
+    title: "发布问题",
+    summary: createSummaryText(state, `最近一次结果里有 ${state.lastIssues.length} 个问题`),
+    emptyMessage: "运行“检查发布问题”或“构建站点”后，可在这里查看阻断项。"
   };
 }
 
@@ -47,9 +47,9 @@ export function createIssuePanelItems(state: PluginExecutionState): IssuePanelIt
 
 export function createLogPanelMeta(state: PluginExecutionState): PanelMeta {
   return {
-    title: "Build Logs",
-    summary: createSummaryText(state, `${state.lastLogs.length} log entr${state.lastLogs.length === 1 ? "y" : "ies"} captured`),
-    emptyMessage: "Run the build or publish command to inspect structured logs here."
+    title: "构建日志",
+    summary: createSummaryText(state, `最近一次结果里记录了 ${state.lastLogs.length} 条日志`),
+    emptyMessage: "运行“构建站点”或“发布站点”后，可在这里查看结构化日志。"
   };
 }
 
@@ -65,11 +65,11 @@ function createSummaryText(state: PluginExecutionState, fallback: string): strin
   const parts = [fallback];
 
   if (state.lastCommand !== undefined) {
-    parts.push(`last command: ${state.lastCommand}`);
+    parts.push(`最近命令：${formatCommand(state.lastCommand)}`);
   }
 
   if (state.lastUpdatedAt !== undefined) {
-    parts.push(`updated: ${state.lastUpdatedAt}`);
+    parts.push(`更新时间：${state.lastUpdatedAt}`);
   }
 
   return parts.join(" | ");
@@ -85,4 +85,19 @@ function createIssueFileLabel(issue: BuildIssue): string {
 
 function formatTimestamp(entry: BuildLogEntry): string {
   return entry.timestamp.replace("T", " ").replace("Z", " UTC");
+}
+
+function formatCommand(command: PluginExecutionState["lastCommand"]): string {
+  switch (command) {
+    case "preview":
+      return "预览";
+    case "build":
+      return "构建";
+    case "publish":
+      return "发布";
+    case "issues":
+      return "检查问题";
+    default:
+      return "未知";
+  }
 }

@@ -26,7 +26,7 @@ export class IssueListView extends ItemView {
   }
 
   public override getDisplayText(): string {
-    return "Publish Issues";
+    return "发布问题";
   }
 
   public override async onOpen(): Promise<void> {
@@ -52,7 +52,7 @@ export class BuildLogView extends ItemView {
   }
 
   public override getDisplayText(): string {
-    return "Build Logs";
+    return "构建日志";
   }
 
   public override async onOpen(): Promise<void> {
@@ -89,7 +89,7 @@ function renderIssuePanel(containerEl: HTMLElement, state: PluginExecutionState)
     if (item.suggestion !== undefined) {
       parent.createEl("div", {
         cls: "osp-panel-hint",
-        text: `Suggestion: ${item.suggestion}`
+        text: `建议：${item.suggestion}`
       });
     }
   });

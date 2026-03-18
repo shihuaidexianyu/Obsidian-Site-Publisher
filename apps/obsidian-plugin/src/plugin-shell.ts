@@ -4,7 +4,7 @@ import type { PluginExecutionBackend, PluginPublishResult, PluginScanResult } fr
 
 export const pluginManifest = {
   id: "obsidian-site-publisher",
-  name: "Obsidian Site Publisher"
+  name: "站点发布"
 } as const;
 
 export type PluginCommand = "preview" | "build" | "publish" | "issues";
@@ -68,10 +68,10 @@ export class PublisherPluginShell {
 
   public getCommandDefinitions(): PluginCommandDefinition[] {
     return [
-      createCommandDefinition("preview", "Preview Site"),
-      createCommandDefinition("build", "Build Site"),
-      createCommandDefinition("publish", "Publish Site"),
-      createCommandDefinition("issues", "Show Publish Issues")
+      createCommandDefinition("preview", "启动站点预览"),
+      createCommandDefinition("build", "构建站点"),
+      createCommandDefinition("publish", "发布站点"),
+      createCommandDefinition("issues", "检查发布问题")
     ];
   }
 
@@ -141,7 +141,7 @@ export class PublisherPluginShell {
 
   private async runBuildCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "build" }>> {
     const result = await backend.build(config);
-    const statusMessage = result.success ? "Build completed successfully." : "Build failed. Check issues and logs.";
+    const statusMessage = result.success ? "站点构建完成。" : "站点构建失败，请检查问题和日志。";
 
     this.updateState({
       lastCommand: "build",
@@ -167,7 +167,7 @@ export class PublisherPluginShell {
 
     try {
       const session = await backend.preview(config);
-      const statusMessage = `Preview ready at ${session.url}`;
+      const statusMessage = `站点预览已启动：${session.url}`;
 
       this.activePreviewBackend = backend;
       this.updateState({
@@ -195,7 +195,7 @@ export class PublisherPluginShell {
     const { build, deploy } = await backend.publish(config);
 
     if (!build.success) {
-      const statusMessage = "Publish stopped because build did not succeed.";
+      const statusMessage = "发布已停止，因为构建没有成功。";
 
       this.updateState({
         lastCommand: "publish",
@@ -216,10 +216,10 @@ export class PublisherPluginShell {
 
     const statusMessage =
       deploy === undefined
-        ? "Build completed, but the deploy step did not return a result."
+        ? "构建已完成，但发布步骤没有返回结果。"
         : deploy.success
-          ? "Publish completed successfully."
-          : "Deploy failed after a successful build.";
+          ? "站点发布成功。"
+          : "构建成功，但发布失败。";
 
     this.updateState({
       lastCommand: "publish",
@@ -270,7 +270,7 @@ export class PublisherPluginShell {
 }
 
 function createUnavailableBackend(): PluginExecutionBackend {
-  const createError = (): Error => new Error("Obsidian Site Publisher backend is not configured.");
+  const createError = (): Error => new Error("插件尚未配置外部 publisher-cli。");
 
   return {
     async scan(): Promise<PluginScanResult> {
@@ -299,8 +299,8 @@ function createCommandDefinition(command: PluginCommand, name: string): PluginCo
 
 function createIssuesStatusMessage(issueCount: number): string {
   if (issueCount === 0) {
-    return "No publish issues detected.";
+    return "没有发现发布问题。";
   }
 
-  return `Found ${issueCount} publish issue(s).`;
+  return `发现 ${issueCount} 个发布问题。`;
 }

@@ -62,9 +62,17 @@ export class PluginCommandController {
 }
 
 function formatPluginCommandError(command: PluginCommand, error: unknown): string {
+  const commandLabel = command === "preview"
+    ? "预览"
+    : command === "build"
+      ? "构建"
+      : command === "publish"
+        ? "发布"
+        : "检查问题";
+
   if (error instanceof Error) {
-    return `${command} failed: ${error.message}`;
+    return `${commandLabel}失败：${error.message}`;
   }
 
-  return `${command} failed with an unknown error.`;
+  return `${commandLabel}失败：发生了未知错误。`;
 }

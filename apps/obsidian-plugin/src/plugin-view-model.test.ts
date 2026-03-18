@@ -29,9 +29,9 @@ describe("plugin view model", () => {
     });
 
     expect(createIssuePanelMeta(state)).toEqual({
-      title: "Publish Issues",
-      summary: "1 issue(s) in the latest result | last command: issues | updated: 2026-03-18T13:00:00.000Z",
-      emptyMessage: "Run the issues or build command to inspect publish blockers here."
+      title: "发布问题",
+      summary: "最近一次结果里有 1 个问题 | 最近命令：检查问题 | 更新时间：2026-03-18T13:00:00.000Z",
+      emptyMessage: "运行“检查发布问题”或“构建站点”后，可在这里查看阻断项。"
     });
     expect(createIssuePanelItems(state)).toEqual([
       {
@@ -57,9 +57,9 @@ describe("plugin view model", () => {
     });
 
     expect(createLogPanelMeta(state)).toEqual({
-      title: "Build Logs",
-      summary: "1 log entry captured | last command: build | updated: 2026-03-18T13:05:00.000Z",
-      emptyMessage: "Run the build or publish command to inspect structured logs here."
+      title: "构建日志",
+      summary: "最近一次结果里记录了 1 条日志 | 最近命令：构建 | 更新时间：2026-03-18T13:05:00.000Z",
+      emptyMessage: "运行“构建站点”或“发布站点”后，可在这里查看结构化日志。"
     });
     expect(createLogPanelItems(state)).toEqual([
       {

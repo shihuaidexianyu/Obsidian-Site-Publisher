@@ -18,10 +18,21 @@ describe("plugin settings", () => {
         deployBranch: "main",
         strictMode: true,
         vaultRoot: "/other"
+      },
+      cli: {
+        executablePath: "/tools/publisher-cli",
+        logDirectory: "/vault/.osp/logs",
+        previewPort: 43180
       }
     });
 
-    expect(settings.config).toMatchObject({
+    expect(settings).toMatchObject({
+      cli: {
+        executablePath: "/tools/publisher-cli",
+        logDirectory: "/vault/.osp/logs",
+        previewPort: 43180
+      },
+      config: {
       vaultRoot: "/vault",
       publishMode: "folder",
       publishRoot: "Public",
@@ -29,6 +40,7 @@ describe("plugin settings", () => {
       deployRepositoryUrl: "https://github.com/example/example.github.io",
       deployBranch: "main",
       strictMode: true
+      }
     });
   });
 
@@ -45,6 +57,7 @@ describe("plugin settings", () => {
       vaultRoot: "/vault",
       outputDir: "/vault/.osp/dist"
     });
+    expect(settings.cli).toEqual({});
   });
 
   it("falls back to defaults when stored data does not match the schema", async () => {
@@ -64,6 +77,7 @@ describe("plugin settings", () => {
       vaultRoot: "/vault",
       strictMode: false
     });
+    expect(settings.cli).toEqual({});
   });
 
   it("persists settings through the provided store", async () => {
@@ -88,6 +102,11 @@ describe("plugin settings", () => {
           deployRepositoryUrl: "https://github.com/example/site.git",
           deployBranch: "gh-pages",
           deployCommitMessage: "Publish docs"
+        },
+        cli: {
+          executablePath: "./tools/publisher-cli",
+          logDirectory: "./logs",
+          previewPort: 8088
         }
       })),
       saveData: vi.fn(async () => {})
@@ -100,6 +119,11 @@ describe("plugin settings", () => {
       deployRepositoryUrl: "https://github.com/example/site.git",
       deployBranch: "gh-pages",
       deployCommitMessage: "Publish docs"
+    });
+    expect(settings.cli).toMatchObject({
+      executablePath: "./tools/publisher-cli",
+      logDirectory: "./logs",
+      previewPort: 8088
     });
   });
 });

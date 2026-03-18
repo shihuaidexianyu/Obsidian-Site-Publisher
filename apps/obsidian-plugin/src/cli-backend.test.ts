@@ -18,15 +18,16 @@ afterEach(async () => {
 });
 
 describe("CliPluginBackend", () => {
-  it("runs one-shot commands through the bundled CLI and parses JSON output", async () => {
+  it("runs one-shot commands through the external CLI and parses JSON output", async () => {
     const pluginRoot = await createTempDirectory();
     const cliEntrypoint = path.join(pluginRoot, "cli.js");
 
     await writeFile(cliEntrypoint, createFakeCliScript(), "utf8");
 
     const backend = new CliPluginBackend({
-      cliEntrypoint,
-      quartzPackageRoot: path.join(pluginRoot, "runtime", "quartz")
+      cliCommand: cliEntrypoint,
+      logDirectory: path.join(pluginRoot, ".osp", "logs"),
+      previewPort: 43180
     });
 
     const result = await backend.build(createConfig(pluginRoot));
@@ -42,7 +43,8 @@ describe("CliPluginBackend", () => {
     await writeFile(cliEntrypoint, createFakeCliScript(), "utf8");
 
     const backend = new CliPluginBackend({
-      cliEntrypoint
+      cliCommand: cliEntrypoint,
+      logDirectory: path.join(pluginRoot, ".osp", "logs")
     });
 
     const session = await backend.preview(createConfig(pluginRoot));
@@ -82,13 +84,16 @@ function createFakeCliScript(): string {
 const fs = require("node:fs");
 const path = require("node:path");
 
-const [, , command, , configPath] = process.argv;
+const argv = process.argv.slice(2);
+const command = argv[0];
+const configPath = argv[2];
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 
 if (command === "preview") {
   console.log(JSON.stringify({
     command: "preview",
     success: true,
+    logPath: path.join(config.vaultRoot, ".osp", "logs", "preview.log"),
     session: {
       url: "http://127.0.0.1:43180",
       workspaceRoot: path.join(config.vaultRoot, ".osp", "preview"),
@@ -103,6 +108,7 @@ if (command === "build") {
   console.log(JSON.stringify({
     command: "build",
     success: true,
+    logPath: path.join(config.vaultRoot, ".osp", "logs", "build.log"),
     result: {
       success: true,
       outputDir: config.outputDir,
@@ -119,6 +125,7 @@ if (command === "scan") {
   console.log(JSON.stringify({
     command: "scan",
     success: true,
+    logPath: path.join(config.vaultRoot, ".osp", "logs", "scan.log"),
     manifest: {
       generatedAt: new Date().toISOString(),
       vaultRoot: config.vaultRoot,
@@ -134,6 +141,7 @@ if (command === "scan") {
 console.log(JSON.stringify({
   command: "deploy",
   success: true,
+  logPath: path.join(config.vaultRoot, ".osp", "logs", "deploy.log"),
   build: {
     success: true,
     outputDir: config.outputDir,

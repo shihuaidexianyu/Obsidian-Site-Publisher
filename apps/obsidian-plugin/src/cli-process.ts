@@ -43,8 +43,8 @@ export function createCliFailureMessage(command: string, exitCode: number, stdou
 
 export function enrichCliLaunchError(cliEntrypoint: string, error: unknown): Error {
   if (error instanceof Error) {
-    return new Error(`Failed to run bundled publisher CLI at ${cliEntrypoint}: ${error.message}`);
+    return new Error(`Failed to run external publisher-cli at ${cliEntrypoint}: ${error.message}`);
   }
 
-  return new Error(`Failed to run bundled publisher CLI at ${cliEntrypoint}.`);
+  return new Error(`Failed to run external publisher-cli at ${cliEntrypoint}.`);
 }

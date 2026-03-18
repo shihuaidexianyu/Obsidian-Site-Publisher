@@ -23,8 +23,9 @@ import {
 } from "./cli-process.js";
 import type { PluginExecutionBackend, PluginPublishResult, PluginScanResult } from "./plugin-backend.js";
 type CliBackendOptions = {
-  cliEntrypoint?: string;
-  quartzPackageRoot?: string;
+  cliCommand: string;
+  logDirectory?: string;
+  previewPort?: number;
   tempRoot?: string;
 };
 type CliChildProcess = ReturnType<typeof spawn>;
@@ -61,25 +62,23 @@ export class CliPluginBackend implements PluginExecutionBackend {
   public async preview(config: PublisherConfig): Promise<PreviewSession> {
     await this.stopActivePreview();
 
-    const cliEntrypoint = this.requireCliEntrypoint();
+    const cliCommand = this.options.cliCommand;
     const normalizedConfig = normalizePluginConfig(config);
     const tempDir = await createCliTempDirectory(this.options.tempRoot);
     const configPath = path.join(tempDir, "publisher.config.json");
 
     await writeCliConfig(configPath, normalizedConfig);
 
-    const child = spawn(process.execPath, this.createCliArgs("preview", configPath, true), {
+    const launch = createCliLaunch(this.options.cliCommand, this.createCliArgs("preview", configPath));
+    const child = spawn(launch.command, launch.args, {
       cwd: normalizedConfig.vaultRoot,
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: "1"
-      },
+      env: launch.env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
     });
 
     if (child.stdout === null || child.stderr === null) {
-      throw new Error("Bundled publisher CLI did not expose stdout/stderr pipes.");
+      throw new Error("External publisher-cli did not expose stdout/stderr pipes.");
     }
 
     child.stdout.setEncoding("utf8");
@@ -139,7 +138,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
       await stopChildProcess(child);
       await exitState.catch(() => undefined);
       await rm(tempDir, { recursive: true, force: true });
-      throw enrichCliLaunchError(cliEntrypoint, error);
+      throw enrichCliLaunchError(cliCommand, error);
     }
   }
 
@@ -167,7 +166,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
     config: PublisherConfig,
     schema: TSchema
   ): Promise<z.output<TSchema>> {
-    const cliEntrypoint = this.requireCliEntrypoint();
+    const cliCommand = this.options.cliCommand;
     const normalizedConfig = normalizePluginConfig(config);
     const tempDir = await createCliTempDirectory(this.options.tempRoot);
     const configPath = path.join(tempDir, "publisher.config.json");
@@ -175,12 +174,10 @@ export class CliPluginBackend implements PluginExecutionBackend {
     await writeCliConfig(configPath, normalizedConfig);
 
     try {
-      const completed = await runCliProcess(process.execPath, this.createCliArgs(command, configPath, false), {
+      const launch = createCliLaunch(this.options.cliCommand, this.createCliArgs(command, configPath));
+      const completed = await runCliProcess(launch.command, launch.args, {
         cwd: normalizedConfig.vaultRoot,
-        env: {
-          ...process.env,
-          ELECTRON_RUN_AS_NODE: "1"
-        }
+        env: launch.env
       });
       const payload = tryParseCliPayload(completed.stdout, schema);
 
@@ -190,30 +187,21 @@ export class CliPluginBackend implements PluginExecutionBackend {
 
       return payload;
     } catch (error) {
-      throw enrichCliLaunchError(cliEntrypoint, error);
+      throw enrichCliLaunchError(cliCommand, error);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
   }
 
-  private createCliArgs(command: "scan" | "build" | "preview" | "deploy", configPath: string, preferStaticPreview: boolean): string[] {
+  private createCliArgs(command: "scan" | "build" | "preview" | "deploy", configPath: string): string[] {
     return [
-      this.requireCliEntrypoint(),
       command,
       "--config",
       configPath,
       "--json",
-      ...(this.options.quartzPackageRoot === undefined ? [] : ["--quartz-package-root", this.options.quartzPackageRoot]),
-      ...(preferStaticPreview ? ["--static-preview"] : [])
+      ...(this.options.logDirectory === undefined ? [] : ["--log-dir", this.options.logDirectory]),
+      ...(this.options.previewPort === undefined ? [] : ["--preview-port", `${this.options.previewPort}`])
     ];
-  }
-
-  private requireCliEntrypoint(): string {
-    if (this.options.cliEntrypoint !== undefined) {
-      return this.options.cliEntrypoint;
-    }
-
-    throw new Error("Bundled publisher CLI entrypoint was not found in the installed plugin.");
   }
 
   private async stopActivePreview(): Promise<void> {
@@ -270,7 +258,7 @@ async function runCliProcess(
   });
 
   if (child.stdout === null || child.stderr === null) {
-    throw new Error("Bundled publisher CLI did not expose stdout/stderr pipes.");
+    throw new Error("External publisher-cli did not expose stdout/stderr pipes.");
   }
 
   child.stdout.setEncoding("utf8");
@@ -298,6 +286,45 @@ async function runCliProcess(
     stdout: stdoutChunks.join(""),
     stderr: stderrChunks.join("")
   };
+}
+
+function createCliLaunch(cliCommand: string, args: string[]): {
+  command: string;
+  args: string[];
+  env: NodeJS.ProcessEnv;
+} {
+  if (/\.(c|m)?js$/iu.test(cliCommand)) {
+    return {
+      command: process.execPath,
+      args: [cliCommand, ...args],
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1"
+      }
+    };
+  }
+
+  if (process.platform === "win32" && /\.(cmd|bat)$/iu.test(cliCommand)) {
+    return {
+      command: process.env.ComSpec ?? "cmd.exe",
+      args: ["/d", "/s", "/c", buildCommandLine(cliCommand, args)],
+      env: process.env
+    };
+  }
+
+  return {
+    command: cliCommand,
+    args,
+    env: process.env
+  };
+}
+
+function buildCommandLine(command: string, args: string[]): string {
+  return [command, ...args].map(quoteShellArgument).join(" ");
+}
+
+function quoteShellArgument(argument: string): string {
+  return /[\s"]/u.test(argument) ? `"${argument.replace(/"/g, '\\"')}"` : argument;
 }
 
 function tryParseCliPayload<TSchema extends z.ZodTypeAny>(stdout: string, schema: TSchema): z.output<TSchema> | undefined {

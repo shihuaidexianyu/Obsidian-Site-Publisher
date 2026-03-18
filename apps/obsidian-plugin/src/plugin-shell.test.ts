@@ -9,10 +9,10 @@ describe("PublisherPluginShell", () => {
     const plugin = new PublisherPluginShell(() => createBackend());
 
     expect(plugin.getCommandDefinitions()).toEqual([
-      { id: "osp:preview", name: "Preview Site", command: "preview" },
-      { id: "osp:build", name: "Build Site", command: "build" },
-      { id: "osp:publish", name: "Publish Site", command: "publish" },
-      { id: "osp:issues", name: "Show Publish Issues", command: "issues" }
+      { id: "osp:preview", name: "启动站点预览", command: "preview" },
+      { id: "osp:build", name: "构建站点", command: "build" },
+      { id: "osp:publish", name: "发布站点", command: "publish" },
+      { id: "osp:issues", name: "检查发布问题", command: "issues" }
     ]);
   });
 
@@ -53,7 +53,7 @@ describe("PublisherPluginShell", () => {
           code: "BROKEN_LINK"
         }
       ],
-      statusMessage: "Found 1 publish issue(s)."
+      statusMessage: "发现 1 个发布问题。"
     });
   });
 
@@ -82,7 +82,7 @@ describe("PublisherPluginShell", () => {
           message: "Quartz build finished."
         }
       ],
-      statusMessage: "Build completed successfully."
+      statusMessage: "站点构建完成。"
     });
   });
 
@@ -150,7 +150,7 @@ describe("PublisherPluginShell", () => {
       lastDeployResult: {
         success: true
       },
-      statusMessage: "Publish completed successfully."
+      statusMessage: "站点发布成功。"
     });
   });
 
@@ -166,7 +166,7 @@ describe("PublisherPluginShell", () => {
 
     expect(result.command).toBe("publish");
     expect(backend.publish).toHaveBeenCalledOnce();
-    expect(plugin.getState().statusMessage).toBe("Publish stopped because build did not succeed.");
+    expect(plugin.getState().statusMessage).toBe("发布已停止，因为构建没有成功。");
   });
 });
 

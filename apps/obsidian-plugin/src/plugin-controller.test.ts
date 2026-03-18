@@ -18,15 +18,15 @@ describe("PluginCommandController", () => {
   it("updates the host status and notice after a command completes", async () => {
     const host = createHost();
     const shell = createShell({
-      statusMessage: "Preview ready at http://localhost:8080"
+      statusMessage: "站点预览已启动：http://localhost:8080"
     });
     const controller = new PluginCommandController(shell, host, () => createConfig("/vault"));
 
     await controller.runCommand("preview");
 
     expect(shell.runCommand).toHaveBeenCalledWith("preview", createConfig("/vault"));
-    expect(host.setStatus).toHaveBeenCalledWith("Preview ready at http://localhost:8080");
-    expect(host.showNotice).toHaveBeenCalledWith("Preview ready at http://localhost:8080");
+    expect(host.setStatus).toHaveBeenCalledWith("站点预览已启动：http://localhost:8080");
+    expect(host.showNotice).toHaveBeenCalledWith("站点预览已启动：http://localhost:8080");
     expect(host.refreshViews).toHaveBeenCalledOnce();
   });
 
@@ -43,10 +43,10 @@ describe("PluginCommandController", () => {
     await controller.runCommand("preview");
 
     expect(host.setStatus).toHaveBeenCalledWith(
-      "preview failed: Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
+      "预览失败：Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
     );
     expect(host.showNotice).toHaveBeenCalledWith(
-      "preview failed: Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
+      "预览失败：Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
     );
     expect(host.refreshViews).toHaveBeenCalledOnce();
   });
@@ -54,7 +54,7 @@ describe("PluginCommandController", () => {
   it("reveals issue and log views for build-oriented commands", async () => {
     const host = createHost();
     const shell = createShell({
-      statusMessage: "Build completed successfully."
+      statusMessage: "站点构建完成。"
     });
     const controller = new PluginCommandController(shell, host, () => createConfig("/vault"));
 
@@ -68,10 +68,10 @@ describe("PluginCommandController", () => {
 
 function createShell(options: { statusMessage?: string } = {}) {
   const definitions: PluginCommandDefinition[] = [
-    { id: "osp:preview", name: "Preview Site", command: "preview" },
-    { id: "osp:build", name: "Build Site", command: "build" },
-    { id: "osp:publish", name: "Publish Site", command: "publish" },
-    { id: "osp:issues", name: "Show Publish Issues", command: "issues" }
+    { id: "osp:preview", name: "启动站点预览", command: "preview" },
+    { id: "osp:build", name: "构建站点", command: "build" },
+    { id: "osp:publish", name: "发布站点", command: "publish" },
+    { id: "osp:issues", name: "检查发布问题", command: "issues" }
   ];
 
   return {
