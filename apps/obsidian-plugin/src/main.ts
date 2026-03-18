@@ -7,7 +7,9 @@ import { pluginManifest, PublisherPluginShell } from "./plugin-shell.js";
 import { loadPluginSettings, savePluginSettings } from "./settings.js";
 
 export * from "./bundled-runtime.js";
+export * from "./cli-backend.js";
 export { pluginManifest } from "./plugin-shell.js";
+export * from "./plugin-backend.js";
 export * from "./plugin-controller.js";
 export * from "./plugin-shell.js";
 export * from "./plugin-view-model.js";
