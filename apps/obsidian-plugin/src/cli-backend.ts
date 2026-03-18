@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { fork, spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -69,30 +69,29 @@ export class CliPluginBackend implements PluginExecutionBackend {
 
     await writeCliConfig(configPath, normalizedConfig);
 
-    const launch = createCliLaunch(this.options.cliCommand, this.createCliArgs("preview", configPath));
-    const child = spawn(launch.command, launch.args, {
-      cwd: normalizedConfig.vaultRoot,
-      env: launch.env,
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true
+    const child = createCliChild(this.options.cliCommand, this.createCliArgs("preview", configPath), {
+      cwd: normalizedConfig.vaultRoot
     });
 
     if (child.stdout === null || child.stderr === null) {
       throw new Error("外部 publisher-cli 未暴露 stdout/stderr 管道。");
     }
 
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
+    const stdoutStream = child.stdout;
+    const stderrStream = child.stderr;
+
+    stdoutStream.setEncoding("utf8");
+    stderrStream.setEncoding("utf8");
 
     const exitState = createCompletedProcessTracker(child);
     let stdout = "";
     let stderr = "";
     let previewResolved = false;
 
-    child.stdout.on("data", (chunk: string) => {
+    stdoutStream.on("data", (chunk: string) => {
       stdout += chunk;
     });
-    child.stderr.on("data", (chunk: string) => {
+    stderrStream.on("data", (chunk: string) => {
       stderr += chunk;
     });
 
@@ -109,7 +108,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
           resolve(payload.session);
         };
 
-        child.stdout.on("data", resolveIfReady);
+        stdoutStream.on("data", resolveIfReady);
         child.once("error", reject);
         child.once("exit", (exitCode) => {
           if (previewResolved) {
@@ -174,10 +173,8 @@ export class CliPluginBackend implements PluginExecutionBackend {
     await writeCliConfig(configPath, normalizedConfig);
 
     try {
-      const launch = createCliLaunch(this.options.cliCommand, this.createCliArgs(command, configPath));
-      const completed = await runCliProcess(launch.command, launch.args, {
-        cwd: normalizedConfig.vaultRoot,
-        env: launch.env
+      const completed = await runCliProcess(this.options.cliCommand, this.createCliArgs(command, configPath), {
+        cwd: normalizedConfig.vaultRoot
       });
       const payload = tryParseCliPayload(completed.stdout, schema);
 
@@ -243,19 +240,13 @@ function resolveVaultRelativePath(vaultRoot: string, value: string): string {
 }
 
 async function runCliProcess(
-  command: string,
+  cliCommand: string,
   args: string[],
   options: {
     cwd: string;
-    env: NodeJS.ProcessEnv;
   }
 ): Promise<CompletedCliProcess> {
-  const child = spawn(command, args, {
-    cwd: options.cwd,
-    env: options.env,
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true
-  });
+  const child = createCliChild(cliCommand, args, options);
 
   if (child.stdout === null || child.stderr === null) {
     throw new Error("外部 publisher-cli 未暴露 stdout/stderr 管道。");
@@ -288,35 +279,44 @@ async function runCliProcess(
   };
 }
 
-function createCliLaunch(cliCommand: string, args: string[]): {
-  command: string;
-  args: string[];
-  env: NodeJS.ProcessEnv;
-} {
+function createCliChild(
+  cliCommand: string,
+  args: string[],
+  options: {
+    cwd: string;
+  }
+): CliChildProcess {
   if (/\.(c|m)?js$/iu.test(cliCommand)) {
-    return {
-      command: process.execPath,
-      args: [cliCommand, ...args],
+    return fork(cliCommand, args, {
+      cwd: options.cwd,
       env: {
         ...process.env,
         ELECTRON_RUN_AS_NODE: "1"
-      }
-    };
+      },
+      execPath: process.execPath,
+      silent: true
+    });
   }
 
   if (process.platform === "win32" && /\.(cmd|bat)$/iu.test(cliCommand)) {
-    return {
-      command: process.env.ComSpec ?? "cmd.exe",
-      args: ["/d", "/s", "/c", buildCommandLine(cliCommand, args)],
-      env: process.env
-    };
+    return spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", buildCommandLine(cliCommand, args)], {
+      cwd: options.cwd,
+      env: {
+        ...process.env
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
+    });
   }
 
-  return {
-    command: cliCommand,
-    args,
-    env: process.env
-  };
+  return spawn(cliCommand, args, {
+    cwd: options.cwd,
+    env: {
+      ...process.env
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true
+  });
 }
 
 function buildCommandLine(command: string, args: string[]): string {
