@@ -1,30 +1,27 @@
 # Obsidian Site Publisher
 
-把 Obsidian vault 中的一部分官方语法笔记发布为静态网站。
+Obsidian Site Publisher 用于将 Obsidian vault 中的一部分官方语法笔记发布为静态网站。
 
-这个项目现在的设计是：
+当前架构如下：
 
 - `publisher-cli` 是独立程序，负责 `scan / build / preview / deploy`
-- Obsidian 插件只负责设置、命令、进度、问题展示和调用外部 CLI
-- Quartz 作为默认静态站点构建器
+- Obsidian 插件负责设置、命令、进度提示、问题展示和调用外部 CLI
+- Quartz 是默认静态站点构建器
 
-## 当前能力
+## 功能概览
 
-目前已经支持：
+当前版本支持：
 
 - 扫描真实 vault，识别笔记、资源、`.canvas`、`.base`
 - 诊断常见问题，例如 broken links、missing assets、duplicate slug
 - 根据 `frontmatter / folder / publishRoot / includeGlobs / excludeGlobs` 选择发布范围
-- 生成 staging workspace，并构建 Quartz 站点
-- 在 Obsidian 里执行 `检查问题 / 构建 / 预览 / 发布`
-- 发布到：
-  - 本地导出目录
-  - Git 分支
-  - GitHub Pages 仓库
+- 生成 staging workspace 并构建 Quartz 站点
+- 在 Obsidian 中执行“检查问题 / 构建 / 预览 / 发布”
+- 发布到本地目录、Git 分支或 GitHub Pages 仓库
 
 ## 支持范围
 
-第一版只面向 Obsidian 官方能力。
+第一版仅面向 Obsidian 官方能力。
 
 支持：
 
@@ -34,28 +31,26 @@
 - 官方附件目录规则
 - 官方 `.canvas` / `.base` 的识别和报告
 
-不支持：
+暂不支持：
 
 - Dataview
 - Templater
 - Excalidraw
 - 其他社区插件语法
-- 在网页端反向编辑 Obsidian 笔记
+- 网页端反向编辑 Obsidian 笔记
 
-## 从零安装
+## 安装
 
-如果你要把这个插件给另一个人从头安装，当前最稳的方式是：先构建 CLI，再构建插件，再在 Obsidian 里把插件指向 CLI。
+当前推荐的安装方式是：先构建 CLI，再构建插件，最后在 Obsidian 中将插件指向 CLI。
 
-### 1. 准备环境
-
-建议准备：
+### 环境要求
 
 - Obsidian
 - Node.js 20+
 - `corepack`
 - Git
 
-### 2. 获取项目并安装依赖
+### 1. 安装依赖
 
 在仓库根目录执行：
 
@@ -63,66 +58,72 @@
 corepack pnpm install
 ```
 
-### 3. 构建 CLI
+### 2. 构建 CLI
 
 ```bash
 corepack pnpm build
 ```
 
-构建完成后，CLI 入口在：
+构建完成后，CLI 入口位于：
 
 - `apps/publisher-cli/dist/main.js`
 
-如果你想直接在终端里调用，也可以自己把它包装成系统命令，包里声明的命令名是 `publisher-cli`。
+包中声明的命令名为 `publisher-cli`。
 
-### 4. 构建 Obsidian 插件
+### 3. 构建 Obsidian 插件
 
 ```bash
 corepack pnpm build:obsidian-plugin
 ```
 
-插件产物会生成到：
+插件产物将生成到：
 
 - `.obsidian-plugin-build/obsidian-site-publisher/`
 
-里面会有：
+其中包含：
 
 - `main.js`
 - `manifest.json`
 - `versions.json`
 
-### 5. 安装到 Obsidian
+### 4. 安装到 Obsidian
 
-把上面 3 个文件复制到你的 vault 目录：
+将上述 3 个文件复制到以下目录：
 
 ```text
 <你的Vault>/.obsidian/plugins/obsidian-site-publisher/
 ```
 
-然后：
+然后在 Obsidian 中：
 
-1. 打开 Obsidian
-2. 进入 `设置 -> 社区插件`
-3. 如果还没开启社区插件，先开启
-4. 启用 `站点发布`
+1. 打开 `设置 -> 社区插件`
+2. 启用社区插件
+3. 启用 `站点发布`
 
-### 6. 在插件设置里绑定 CLI
+### 5. 配置外部 CLI
 
-启用插件后，进入插件设置页，找到：
+启用插件后，在插件设置页中填写：
 
 - `CLI 可执行文件路径`
 
-推荐直接填你本机构建出来的 CLI 路径，例如 Windows：
+Windows 常见示例：
 
 ```text
 C:\Users\<你的用户名>\path\to\Obsidian Site Publisher\apps\publisher-cli\dist\main.js
 ```
 
-如果你已经把 `publisher-cli` 放进系统 `PATH`，也可以留空，让插件自己查找。
+如果系统 `PATH` 中已经可直接找到 `publisher-cli`，该项可以留空。
 
-### 7. 配置发布范围
+## 使用方式
 
-插件设置页里可以直接配置：
+插件启用并配置完成后，可以在 Obsidian 命令面板中使用：
+
+- `站点发布：检查问题`
+- `站点发布：构建`
+- `站点发布：启动预览`
+- `站点发布：发布`
+
+插件设置页支持以下配置：
 
 - 发布模式
 - 发布根目录
@@ -135,36 +136,27 @@ C:\Users\<你的用户名>\path\to\Obsidian Site Publisher\apps\publisher-cli\di
 - 部署分支
 - 提交信息
 
-常见做法是：
+常见用法：
 
-- 用 `Folder` 模式发布某个目录
-- 用 `只包含这些路径` 精确纳入要展示的文件夹
-- 用 `排除这些路径` 隐藏 `日记/草稿/私有目录`
+- 使用 `Folder` 模式发布某个目录
+- 使用“只包含这些路径”精确纳入需要展示的文件夹
+- 使用“排除这些路径”隐藏日记、草稿或私有目录
 
-### 8. 开始使用
-
-插件启用并配置好 CLI 后，可以在命令面板里使用：
-
-- `站点发布：检查问题`
-- `站点发布：构建`
-- `站点发布：启动预览`
-- `站点发布：发布`
-
-## 日志和输出
+## 输出与日志
 
 默认情况下：
 
-- 构建/预览工作目录在 `<vault>/.osp/`
-- CLI 日志在 `<vault>/.osp/logs/`
-- 构建产物通常在 `<vault>/.osp/build/dist/`
+- 构建/预览工作目录位于 `<vault>/.osp/`
+- CLI 日志位于 `<vault>/.osp/logs/`
+- 构建产物通常位于 `<vault>/.osp/build/dist/`
 
-插件侧边栏只保留轻量摘要，完整构建日志请看 `.osp/logs`。
+插件侧边栏仅显示轻量摘要，完整构建日志请查看 `.osp/logs`。
 
 ## 常见问题
 
-### 1. 插件里只看到“检查问题”，看不到构建/发布
+### 插件里只看到“检查问题”，看不到构建或发布
 
-通常是 Obsidian 还在加载旧版插件文件。请重新覆盖：
+通常表示 Obsidian 仍在加载旧版插件文件。请重新覆盖：
 
 - `main.js`
 - `manifest.json`
@@ -172,24 +164,24 @@ C:\Users\<你的用户名>\path\to\Obsidian Site Publisher\apps\publisher-cli\di
 
 然后完全重启 Obsidian。
 
-### 2. 构建时报 `EMPTY_PUBLISH_SLICE`
+### 构建时报 `EMPTY_PUBLISH_SLICE`
 
-说明当前配置没有选中任何笔记。请检查：
+表示当前配置没有选中任何笔记。建议检查：
 
-- 发布模式是不是选对了
+- 发布模式是否正确
 - `publishRoot` 是否过窄
-- `includeGlobs / excludeGlobs` 是否把内容都排掉了
-- `frontmatter` 模式下是否至少有一篇笔记带 `publish: true`
+- `includeGlobs / excludeGlobs` 是否排除了全部内容
+- `frontmatter` 模式下是否至少有一篇笔记包含 `publish: true`
 
-### 3. Obsidian 正常、网页里数学公式报错
+### Obsidian 中正常显示，但网页中的数学公式报错
 
-项目现在会在 staging 时做一小部分数学兼容归一化，例如：
+项目会在 staging 阶段做一小部分数学兼容归一化，例如：
 
 - `($$ ... $$)` -> `$...$`
 - `\(...\)` -> `$...$`
 - `\[...\]` -> `$$ ... $$`
 
-但如果公式里直接混中文、标题、粗体等 Markdown 语法，Quartz/KaTeX 仍可能告警。
+如果公式中直接混用中文、标题或粗体等 Markdown 语法，Quartz/KaTeX 仍可能给出告警。
 
 ## 部署配置示例
 
@@ -234,15 +226,13 @@ GitHub Pages：
 
 ## 开发说明
 
-主要工程规则在：
+相关文档：
 
-- [docs/prompts/engineering-rules.md](/c:/Users/exqin/Desktop/Obsidian%20Site%20Publisher/docs/prompts/engineering-rules.md)
-- [docs/prompts/task-template.md](/c:/Users/exqin/Desktop/Obsidian%20Site%20Publisher/docs/prompts/task-template.md)
+- [工程规则](docs/prompts/engineering-rules.md)
+- [任务模板](docs/prompts/task-template.md)
+- [插件说明](apps/obsidian-plugin/README.md)
+- [路线图](todo.md)
 
 真实 smoke-test vault：
 
 - `test_vault/hw`
-
-路线图：
-
-- [todo.md](/c:/Users/exqin/Desktop/Obsidian%20Site%20Publisher/todo.md)
