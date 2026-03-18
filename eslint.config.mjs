@@ -7,6 +7,7 @@ export default [
     ignores: [
       "**/*.d.ts",
       "**/.generated/**",
+      "**/.obsidian-plugin-build/**",
       "**/.osp/**",
       "**/dist/**",
       "**/node_modules/**",
