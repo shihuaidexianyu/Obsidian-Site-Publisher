@@ -19,7 +19,7 @@ const config: PublisherConfig = {
 };
 
 describe("DefaultDiagnosticsEngine", () => {
-  it("reports duplicate slugs and unsupported objects", () => {
+  it("reports broken links, duplicate slugs, and unsupported objects", () => {
     const manifest: VaultManifest = {
       generatedAt: new Date().toISOString(),
       vaultRoot: "/vault",
@@ -33,7 +33,17 @@ describe("DefaultDiagnosticsEngine", () => {
           headings: [],
           blockIds: [],
           properties: {},
-          links: [],
+          links: [
+            {
+              raw: "[[Missing]]",
+              target: "Missing",
+              kind: "wikilink",
+              location: {
+                line: 3,
+                column: 1
+              }
+            }
+          ],
           embeds: [],
           assets: [],
           publish: true
@@ -64,7 +74,11 @@ describe("DefaultDiagnosticsEngine", () => {
 
     const issues = new DefaultDiagnosticsEngine().analyze(manifest, config);
 
-    expect(issues).toHaveLength(2);
-    expect(issues.map((issue) => issue.code)).toEqual(["DUPLICATE_SLUG", "UNSUPPORTED_CANVAS"]);
+    expect(issues).toHaveLength(3);
+    expect(issues.map((issue) => issue.code)).toEqual([
+      "BROKEN_LINK",
+      "DUPLICATE_SLUG",
+      "UNSUPPORTED_CANVAS"
+    ]);
   });
 });

@@ -16,6 +16,7 @@
 
 - `DiagnosticsEngine`
 - `DefaultDiagnosticsEngine`
+- `analyzeBrokenLinks`
 - `analyzeDuplicateSlugs`
 - `analyzeDuplicatePermalinks`
 

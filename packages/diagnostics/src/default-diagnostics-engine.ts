@@ -1,10 +1,12 @@
 import type { BuildIssue, PublisherConfig, UnsupportedObjectRecord, VaultManifest } from "@osp/shared";
 
 import type { DiagnosticsEngine } from "./contracts";
+import { analyzeBrokenLinks } from "./broken-link-analysis";
 
 export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
   public analyze(manifest: VaultManifest, _config: PublisherConfig): BuildIssue[] {
     return [
+      ...analyzeBrokenLinks(manifest),
       ...analyzeDuplicateSlugs(manifest),
       ...analyzeDuplicatePermalinks(manifest),
       ...analyzeUnsupportedObjects(manifest.unsupportedObjects)
