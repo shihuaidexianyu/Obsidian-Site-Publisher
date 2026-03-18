@@ -49,11 +49,41 @@ describe("PublisherOrchestrator", () => {
     expect(result.success).toBe(true);
     expect(builder.build).toHaveBeenCalledOnce();
   });
+
+  it("returns a structured deploy result when the deploy adapter throws", async () => {
+    const deploy: DeployAdapter = {
+      deploy: vi.fn(async () => {
+        throw new Error("Git branch deploy failed: repository is missing user.name/user.email.");
+      })
+    };
+    const orchestrator = createOrchestrator({
+      deploy
+    });
+
+    const result = await orchestrator.deployFromBuild(
+      {
+        success: true,
+        outputDir: "/workspace/dist",
+        manifestPath: "/workspace/manifest.json",
+        issues: [],
+        logs: [],
+        durationMs: 1
+      },
+      createConfig(false)
+    );
+
+    expect(result).toEqual({
+      success: false,
+      target: "none",
+      message: "Git branch deploy failed: repository is missing user.name/user.email."
+    });
+  });
 });
 
 function createOrchestrator(options: {
   builder?: BuilderAdapter & { build: ReturnType<typeof vi.fn>; preview: ReturnType<typeof vi.fn> };
   diagnosticsIssues?: BuildIssue[];
+  deploy?: DeployAdapter;
 }): PublisherOrchestrator {
   const parser: VaultParser = {
     scanVault: vi.fn(async (): Promise<ScanResult> => ({
@@ -72,7 +102,7 @@ function createOrchestrator(options: {
       manifestPath: "/workspace/manifest.json"
     }))
   };
-  const deploy: DeployAdapter = {
+  const deploy: DeployAdapter = options.deploy ?? {
     deploy: vi.fn(async (): Promise<DeployResult> => ({
       success: true,
       target: "none",

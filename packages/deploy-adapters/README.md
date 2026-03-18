@@ -6,6 +6,7 @@
 - structured deploy results
 - future Git and GitHub Pages publishing implementations
 - local filesystem export for real deploy smoke tests
+- git branch deployment for branch-based publishing workflows
 
 ## Not Responsible For
 
@@ -18,6 +19,7 @@
 - `DeployAdapter`
 - `DefaultDeployAdapter`
 - `FileSystemDeployAdapter`
+- `GitBranchDeployAdapter`
 - `NoopDeployAdapter`
 
 ## Depends On

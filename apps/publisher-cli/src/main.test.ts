@@ -62,7 +62,9 @@ describe("runCli", () => {
           publishRoot: "Public",
           strictMode: true,
           deployTarget: "local-export",
-          deployOutputDir: "./exports/site"
+          deployOutputDir: "./exports/site",
+          deployBranch: "site",
+          deployCommitMessage: "Publish from config"
         },
         null,
         2
@@ -84,7 +86,9 @@ describe("runCli", () => {
         publishRoot: "Public",
         strictMode: true,
         deployTarget: "local-export",
-        deployOutputDir: path.join(cwd, "exports", "site")
+        deployOutputDir: path.join(cwd, "exports", "site"),
+        deployBranch: "site",
+        deployCommitMessage: "Publish from config"
       })
     );
     expect(output.logs.join("\n")).toContain("Using config");

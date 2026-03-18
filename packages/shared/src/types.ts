@@ -105,6 +105,8 @@ export type PublisherConfig = {
   builder: BuilderKind;
   deployTarget: DeployTarget;
   deployOutputDir?: string;
+  deployBranch?: string;
+  deployCommitMessage?: string;
   enableSearch: boolean;
   enableBacklinks: boolean;
   enableGraph: boolean;

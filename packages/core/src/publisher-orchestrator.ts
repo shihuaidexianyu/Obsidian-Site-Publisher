@@ -71,7 +71,15 @@ export class PublisherOrchestrator {
   }
 
   public async deployFromBuild(build: BuildResult, config: PublisherConfig): Promise<DeployResult> {
-    return this.dependencies.deploy.deploy(build, config);
+    try {
+      return await this.dependencies.deploy.deploy(build, config);
+    } catch (error) {
+      return {
+        success: false,
+        target: config.deployTarget,
+        message: formatDeployError(error)
+      };
+    }
   }
 
   private createScanReport(scanResult: ScanResult, config: PublisherConfig): ScanReport {
@@ -123,4 +131,12 @@ function createBlockedActionMessage(
   }
 
   return `Cannot ${action} because blocking issues were detected.`;
+}
+
+function formatDeployError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Deploy failed with an unknown error.";
 }

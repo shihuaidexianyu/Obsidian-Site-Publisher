@@ -6,12 +6,12 @@ import { DefaultDeployAdapter } from "./default-deploy-adapter.js";
 describe("DefaultDeployAdapter", () => {
   it("returns a structured failure for unimplemented deploy targets", async () => {
     const adapter = new DefaultDeployAdapter();
-    const result = await adapter.deploy(createBuildResult(), createConfig("git-branch"));
+    const result = await adapter.deploy(createBuildResult(), createConfig("github-pages"));
 
     expect(result).toEqual({
       success: false,
-      target: "git-branch",
-      message: "Deploy target git-branch is not implemented yet."
+      target: "github-pages",
+      message: "Deploy target github-pages is not implemented yet."
     });
   });
 });

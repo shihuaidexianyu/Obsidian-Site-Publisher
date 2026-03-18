@@ -95,6 +95,8 @@ export const PublisherConfigSchema = z.object({
   builder: z.enum(builderKinds),
   deployTarget: z.enum(deployTargets),
   deployOutputDir: z.string().optional(),
+  deployBranch: z.string().optional(),
+  deployCommitMessage: z.string().optional(),
   enableSearch: z.boolean(),
   enableBacklinks: z.boolean(),
   enableGraph: z.boolean(),

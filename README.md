@@ -25,6 +25,24 @@ Real pipeline status today:
 - scan / diagnose / stage / build / preview are wired through the default runtime
 - plugin and CLI both call the same `@osp/core` orchestration path
 - deploy now has a real `local-export` target that copies a successful build into a dedicated output directory
+- deploy also supports `git-branch`, which commits the built site into a dedicated branch such as `gh-pages`
+
+Useful deploy config examples:
+
+```json
+{
+  "deployTarget": "local-export",
+  "deployOutputDir": "./published-site"
+}
+```
+
+```json
+{
+  "deployTarget": "git-branch",
+  "deployBranch": "gh-pages",
+  "deployCommitMessage": "Deploy static site"
+}
+```
 
 ## Engineering Guardrails
 
