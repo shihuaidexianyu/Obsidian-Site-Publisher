@@ -122,4 +122,70 @@ describe("DefaultDiagnosticsEngine", () => {
       "UNSUPPORTED_CANVAS"
     ]);
   });
+
+  it("uses the configured publish slice instead of raw note.publish flags", () => {
+    const manifest: VaultManifest = {
+      generatedAt: new Date().toISOString(),
+      vaultRoot: "/vault",
+      notes: [
+        {
+          id: "1",
+          path: "Public/Home.md",
+          title: "Home",
+          slug: "shared-slug",
+          aliases: [],
+          headings: [],
+          blockIds: [],
+          properties: {},
+          links: [
+            {
+              raw: "[[Missing]]",
+              target: "Missing",
+              kind: "wikilink"
+            },
+            {
+              raw: "[[../Private/Secret]]",
+              target: "../Private/Secret",
+              kind: "wikilink"
+            }
+          ],
+          embeds: [],
+          assets: [],
+          publish: false
+        },
+        {
+          id: "2",
+          path: "Private/Secret.md",
+          title: "Secret",
+          slug: "shared-slug",
+          aliases: [],
+          headings: [],
+          blockIds: [],
+          properties: {},
+          links: [
+            {
+              raw: "[[Ghost]]",
+              target: "Ghost",
+              kind: "wikilink"
+            }
+          ],
+          embeds: [],
+          assets: [],
+          publish: false
+        }
+      ],
+      assetFiles: [],
+      unsupportedObjects: []
+    };
+
+    const issues = new DefaultDiagnosticsEngine().analyze(manifest, {
+      ...config,
+      publishMode: "folder",
+      publishRoot: "Public"
+    });
+
+    expect(issues.map((issue) => issue.code)).toEqual(["BROKEN_LINK", "UNPUBLISHED_REFERENCE"]);
+    expect(issues[0]?.file).toBe("Public/Home.md");
+    expect(issues[1]?.message).toContain('references unpublished note "Private/Secret.md"');
+  });
 });

@@ -2,11 +2,15 @@ import type { BuildIssue, VaultManifest } from "@osp/shared";
 
 import { normalizePath, resolveAssetTarget } from "./reference-resolution";
 
-export function analyzeMissingAssets(manifest: VaultManifest): BuildIssue[] {
+export function analyzeMissingAssets(manifest: VaultManifest, sourceNotePaths?: ReadonlySet<string>): BuildIssue[] {
   const availableAssets = new Set(manifest.assetFiles.map((asset) => normalizePath(asset.path)));
   const issues: BuildIssue[] = [];
 
   for (const note of manifest.notes) {
+    if (sourceNotePaths !== undefined && !sourceNotePaths.has(normalizePath(note.path))) {
+      continue;
+    }
+
     for (const asset of note.assets) {
       const resolvedAssetPath = resolveAssetTarget(note.path, asset.path);
 

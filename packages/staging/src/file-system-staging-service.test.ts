@@ -85,6 +85,39 @@ describe("FileSystemStagingService", () => {
     await expectFileToExist(path.join(workspace.contentDir, "Public", "Guide.md"));
     await expectFileToBeMissing(path.join(workspace.contentDir, "Private", "Draft.md"));
   });
+
+  it("respects includeGlobs and excludeGlobs when selecting notes to stage", async () => {
+    const vaultRoot = await createTempDirectory("osp-staging-glob-vault-");
+    const stagingRoot = await createTempDirectory("osp-staging-glob-root-");
+
+    await writeVaultFile(vaultRoot, "Public/Keep.md", "# Keep\n");
+    await writeVaultFile(vaultRoot, "Public/Drafts/Skip.md", "# Skip\n");
+    await writeVaultFile(vaultRoot, "Private/Skip.md", "# Skip\n");
+
+    const manifest = createManifest(vaultRoot, {
+      notes: [
+        createNote("Public/Keep.md"),
+        createNote("Public/Drafts/Skip.md"),
+        createNote("Private/Skip.md")
+      ],
+      assetFiles: []
+    });
+
+    const workspace = await new FileSystemStagingService().prepare({
+      config: createConfig(vaultRoot, {
+        publishMode: "folder",
+        includeGlobs: ["Public/**/*.md"],
+        excludeGlobs: ["**/Drafts/**"]
+      }),
+      manifest,
+      mode: "build",
+      stagingRoot
+    });
+
+    await expectFileToExist(path.join(workspace.contentDir, "Public", "Keep.md"));
+    await expectFileToBeMissing(path.join(workspace.contentDir, "Public", "Drafts", "Skip.md"));
+    await expectFileToBeMissing(path.join(workspace.contentDir, "Private", "Skip.md"));
+  });
 });
 
 function createConfig(

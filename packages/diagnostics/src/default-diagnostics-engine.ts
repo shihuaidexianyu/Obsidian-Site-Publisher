@@ -1,3 +1,4 @@
+import { createPublishedNotePathSet, selectPublishedNotes } from "@osp/shared";
 import type { BuildIssue, PublisherConfig, UnsupportedObjectRecord, VaultManifest } from "@osp/shared";
 
 import type { DiagnosticsEngine } from "./contracts";
@@ -8,25 +9,28 @@ import { analyzeMissingAssets } from "./missing-asset-analysis";
 import { analyzeUnpublishedReferences } from "./unpublished-reference-analysis";
 
 export class DefaultDiagnosticsEngine implements DiagnosticsEngine {
-  public analyze(manifest: VaultManifest, _config: PublisherConfig): BuildIssue[] {
+  public analyze(manifest: VaultManifest, config: PublisherConfig): BuildIssue[] {
+    const publishedNotePaths = createPublishedNotePathSet(manifest, config);
+    const publishedNotes = selectPublishedNotes(manifest, config);
+
     return [
-      ...analyzeBrokenLinks(manifest),
+      ...analyzeBrokenLinks(manifest, publishedNotePaths),
       ...analyzeInvalidFrontmatter(manifest),
-      ...analyzeMissingAssets(manifest),
-      ...analyzeUnpublishedReferences(manifest),
-      ...analyzeDuplicateSlugs(manifest),
-      ...analyzeDuplicatePermalinks(manifest),
-      ...analyzeCircularEmbeds(manifest),
+      ...analyzeMissingAssets(manifest, publishedNotePaths),
+      ...analyzeUnpublishedReferences(manifest, publishedNotePaths),
+      ...analyzeDuplicateSlugs(publishedNotes),
+      ...analyzeDuplicatePermalinks(publishedNotes),
+      ...analyzeCircularEmbeds(manifest, publishedNotePaths),
       ...analyzeUnsupportedObjects(manifest.unsupportedObjects)
     ];
   }
 }
 
-export function analyzeDuplicateSlugs(manifest: VaultManifest): BuildIssue[] {
+export function analyzeDuplicateSlugs(notes: VaultManifest["notes"]): BuildIssue[] {
   const seen = new Map<string, string>();
   const issues: BuildIssue[] = [];
 
-  for (const note of manifest.notes) {
+  for (const note of notes) {
     const previousPath = seen.get(note.slug);
 
     if (previousPath !== undefined) {
@@ -46,11 +50,11 @@ export function analyzeDuplicateSlugs(manifest: VaultManifest): BuildIssue[] {
   return issues;
 }
 
-export function analyzeDuplicatePermalinks(manifest: VaultManifest): BuildIssue[] {
+export function analyzeDuplicatePermalinks(notes: VaultManifest["notes"]): BuildIssue[] {
   const seen = new Map<string, string>();
   const issues: BuildIssue[] = [];
 
-  for (const note of manifest.notes) {
+  for (const note of notes) {
     if (note.permalink === undefined) {
       continue;
     }

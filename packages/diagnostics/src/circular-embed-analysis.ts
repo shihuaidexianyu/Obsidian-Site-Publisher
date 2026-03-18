@@ -1,17 +1,18 @@
 import type { BuildIssue, NoteRecord, VaultManifest } from "@osp/shared";
 
-import { createNoteIndex, resolveNoteTarget, splitLinkTarget } from "./reference-resolution";
+import { createNoteIndex, normalizePath, resolveNoteTarget, splitLinkTarget } from "./reference-resolution";
 
-export function analyzeCircularEmbeds(manifest: VaultManifest): BuildIssue[] {
+export function analyzeCircularEmbeds(manifest: VaultManifest, publishedNotePaths?: ReadonlySet<string>): BuildIssue[] {
   const noteIndex = createNoteIndex(manifest.notes);
-  const adjacency = createEmbedAdjacency(manifest.notes, noteIndex);
+  const activeNotes = filterNotes(manifest.notes, publishedNotePaths);
+  const adjacency = createEmbedAdjacency(activeNotes, noteIndex, publishedNotePaths);
   const visited = new Set<string>();
   const activeStack: string[] = [];
   const activeSet = new Set<string>();
   const cycleKeys = new Set<string>();
   const issues: BuildIssue[] = [];
 
-  for (const note of manifest.notes) {
+  for (const note of activeNotes) {
     if (!visited.has(note.path)) {
       walk(note.path, adjacency, visited, activeStack, activeSet, cycleKeys, issues);
     }
@@ -22,7 +23,8 @@ export function analyzeCircularEmbeds(manifest: VaultManifest): BuildIssue[] {
 
 function createEmbedAdjacency(
   notes: NoteRecord[],
-  noteIndex: ReturnType<typeof createNoteIndex>
+  noteIndex: ReturnType<typeof createNoteIndex>,
+  publishedNotePaths?: ReadonlySet<string>
 ): Map<string, string[]> {
   const adjacency = new Map<string, string[]>();
 
@@ -30,7 +32,8 @@ function createEmbedAdjacency(
     const targets = note.embeds
       .filter((embed) => embed.kind === "note")
       .map((embed) => resolveNoteTarget(note, splitLinkTarget(embed.target).noteTarget, noteIndex)?.path)
-      .filter((targetPath): targetPath is string => targetPath !== undefined);
+      .filter((targetPath): targetPath is string => targetPath !== undefined)
+      .filter((targetPath) => publishedNotePaths === undefined || publishedNotePaths.has(normalizePath(targetPath)));
 
     adjacency.set(note.path, [...new Set(targets)]);
   }
@@ -87,4 +90,12 @@ function createCycleKey(cyclePath: string[]): string {
   const uniqueNodes = [...new Set(cyclePath.slice(0, -1))].sort();
 
   return uniqueNodes.join("|");
+}
+
+function filterNotes(notes: NoteRecord[], publishedNotePaths?: ReadonlySet<string>): NoteRecord[] {
+  if (publishedNotePaths === undefined) {
+    return notes;
+  }
+
+  return notes.filter((note) => publishedNotePaths.has(normalizePath(note.path)));
 }

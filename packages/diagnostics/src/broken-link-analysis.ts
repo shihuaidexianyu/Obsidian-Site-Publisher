@@ -1,13 +1,17 @@
 import type { BuildIssue, LinkRef, NoteRecord, VaultManifest } from "@osp/shared";
 
 import type { NoteIndex } from "./reference-resolution";
-import { createNoteIndex, isAssetTarget, resolveNoteTarget, slugifyAnchor, splitLinkTarget } from "./reference-resolution";
+import { createNoteIndex, isAssetTarget, normalizePath, resolveNoteTarget, slugifyAnchor, splitLinkTarget } from "./reference-resolution";
 
-export function analyzeBrokenLinks(manifest: VaultManifest): BuildIssue[] {
+export function analyzeBrokenLinks(manifest: VaultManifest, sourceNotePaths?: ReadonlySet<string>): BuildIssue[] {
   const noteIndex = createNoteIndex(manifest.notes);
   const issues: BuildIssue[] = [];
 
   for (const note of manifest.notes) {
+    if (sourceNotePaths !== undefined && !sourceNotePaths.has(normalizePath(note.path))) {
+      continue;
+    }
+
     for (const link of note.links) {
       if (link.kind === "external" || isAssetTarget(link.target)) {
         continue;

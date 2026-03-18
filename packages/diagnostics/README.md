@@ -3,6 +3,7 @@
 ## Responsible For
 
 - deterministic diagnostics over a normalized manifest
+- applying publish-slice semantics to slice-sensitive rules
 - duplicate and unsupported-object detection
 - broken-link, asset, frontmatter, and embed-cycle analysis
 

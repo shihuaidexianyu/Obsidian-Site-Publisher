@@ -1,13 +1,16 @@
 import type { BuildIssue, LinkRef, NoteRecord, VaultManifest } from "@osp/shared";
 
-import { createNoteIndex, isAssetTarget, resolveNoteTarget, splitLinkTarget } from "./reference-resolution";
+import { createNoteIndex, isAssetTarget, normalizePath, resolveNoteTarget, splitLinkTarget } from "./reference-resolution";
 
-export function analyzeUnpublishedReferences(manifest: VaultManifest): BuildIssue[] {
+export function analyzeUnpublishedReferences(
+  manifest: VaultManifest,
+  publishedNotePaths?: ReadonlySet<string>
+): BuildIssue[] {
   const noteIndex = createNoteIndex(manifest.notes);
   const issues: BuildIssue[] = [];
 
   for (const note of manifest.notes) {
-    if (!note.publish) {
+    if (!isPublishedSourceNote(note, publishedNotePaths)) {
       continue;
     }
 
@@ -18,7 +21,7 @@ export function analyzeUnpublishedReferences(manifest: VaultManifest): BuildIssu
 
       const targetNote = resolveLinkedNote(note, link.target, noteIndex);
 
-      if (targetNote === undefined || targetNote.publish) {
+      if (targetNote === undefined || isPublishedTargetNote(targetNote, publishedNotePaths)) {
         continue;
       }
 
@@ -32,7 +35,7 @@ export function analyzeUnpublishedReferences(manifest: VaultManifest): BuildIssu
 
       const targetNote = resolveLinkedNote(note, embed.target, noteIndex);
 
-      if (targetNote === undefined || targetNote.publish) {
+      if (targetNote === undefined || isPublishedTargetNote(targetNote, publishedNotePaths)) {
         continue;
       }
 
@@ -41,6 +44,22 @@ export function analyzeUnpublishedReferences(manifest: VaultManifest): BuildIssu
   }
 
   return issues;
+}
+
+function isPublishedSourceNote(note: NoteRecord, publishedNotePaths?: ReadonlySet<string>): boolean {
+  if (publishedNotePaths !== undefined) {
+    return publishedNotePaths.has(normalizePath(note.path));
+  }
+
+  return note.publish;
+}
+
+function isPublishedTargetNote(targetNote: NoteRecord, publishedNotePaths?: ReadonlySet<string>): boolean {
+  if (publishedNotePaths !== undefined) {
+    return publishedNotePaths.has(normalizePath(targetNote.path));
+  }
+
+  return targetNote.publish;
 }
 
 function shouldIgnoreLink(link: LinkRef): boolean {

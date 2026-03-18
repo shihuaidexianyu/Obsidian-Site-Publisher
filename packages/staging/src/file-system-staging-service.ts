@@ -1,6 +1,7 @@
 import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { selectPublishedNotes } from "@osp/shared";
 import type { AssetRef, NoteRecord, PreparedWorkspace, VaultManifest } from "@osp/shared";
 
 import type { PrepareStagingInput, StagingService } from "./contracts";
@@ -30,20 +31,6 @@ export class FileSystemStagingService implements StagingService {
       manifestPath
     };
   }
-}
-
-function selectPublishedNotes(manifest: VaultManifest, inputConfig: PrepareStagingInput["config"]): NoteRecord[] {
-  if (inputConfig.publishMode === "folder") {
-    const publishRoot = normalizeRelativePath(inputConfig.publishRoot);
-
-    if (publishRoot === undefined) {
-      return [...manifest.notes];
-    }
-
-    return manifest.notes.filter((note) => isWithinPublishRoot(note.path, publishRoot));
-  }
-
-  return manifest.notes.filter((note) => note.publish);
 }
 
 function collectReferencedAssets(notes: NoteRecord[], availableAssets: AssetRef[]): AssetRef[] {
@@ -94,10 +81,6 @@ async function copyVaultFiles(vaultRoot: string, targetRoot: string, relativePat
     await mkdir(path.dirname(destinationPath), { recursive: true });
     await copyFile(sourcePath, destinationPath);
   }
-}
-
-function isWithinPublishRoot(notePath: string, publishRoot: string): boolean {
-  return notePath === publishRoot || notePath.startsWith(`${publishRoot}/`);
 }
 
 function resolveAssetTarget(sourcePath: string, assetPath: string): string | undefined {
