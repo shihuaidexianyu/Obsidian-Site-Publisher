@@ -31,6 +31,7 @@
 - opens a dedicated issues view for scan/build results
 - opens a dedicated build logs view for build/publish results
 - executes commands through a bundled CLI subprocess so Quartz/build work stays outside the Obsidian renderer
+- keeps plugin-specific code focused on settings, views, and subprocess bridging rather than core pipeline logic
 - keeps the latest issues, logs, build result, preview session, and deploy result in plugin state
 
 ## Packaging
