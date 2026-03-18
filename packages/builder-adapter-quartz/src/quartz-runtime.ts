@@ -1,4 +1,4 @@
-import { cp, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, cp, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { PreparedWorkspace, PublisherConfig } from "@osp/shared";
@@ -23,7 +23,7 @@ export async function ensureQuartzWorkspaceRuntime(
     });
   }
 
-  await ensureNodeModulesLink(workspace.rootDir, path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules"));
+  await ensureNodeModulesLink(workspace.rootDir, await resolveQuartzNodeModulesPath(quartzPackageRoot));
   await writeFile(path.join(workspace.rootDir, "quartz.config.ts"), renderQuartzConfig(config), "utf8");
   await writeFile(path.join(workspace.rootDir, "quartz.layout.ts"), renderQuartzLayout(config), "utf8");
 }
@@ -51,6 +51,30 @@ async function ensureNodeModulesLink(workspaceRoot: string, sourceNodeModulesPat
   }
 
   await symlink(sourceNodeModulesPath, linkPath, "junction");
+}
+
+export async function resolveQuartzNodeModulesPath(quartzPackageRoot: string): Promise<string> {
+  const candidatePaths = [
+    path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules"),
+    path.resolve(quartzPackageRoot, "..", "..")
+  ];
+
+  for (const candidatePath of candidatePaths) {
+    try {
+      await access(candidatePath);
+      return candidatePath;
+    } catch {
+      // Try the next runtime layout.
+    }
+  }
+
+  throw new Error(
+    [
+      "Quartz runtime dependencies could not be located.",
+      `Quartz package root: ${quartzPackageRoot}`,
+      "Expected either a pnpm virtual store node_modules path or a flat node_modules directory next to the vendored package."
+    ].join(" ")
+  );
 }
 
 function renderQuartzConfig(config: PublisherConfig): string {

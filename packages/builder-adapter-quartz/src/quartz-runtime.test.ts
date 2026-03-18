@@ -1,0 +1,48 @@
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import { resolveQuartzNodeModulesPath } from "./quartz-runtime.js";
+
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true });
+    })
+  );
+});
+
+describe("resolveQuartzNodeModulesPath", () => {
+  it("prefers the pnpm virtual store layout when present", async () => {
+    const quartzPackageRoot = await createDirectoryTree([
+      ".pnpm/node_modules",
+      ".pnpm/@jackyzha0+quartz/node_modules/@jackyzha0/quartz"
+    ]);
+
+    expect(await resolveQuartzNodeModulesPath(quartzPackageRoot)).toBe(
+      path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules")
+    );
+  });
+
+  it("falls back to a flat node_modules directory for vendored plugin runtimes", async () => {
+    const quartzPackageRoot = await createDirectoryTree(["node_modules/@jackyzha0/quartz"]);
+
+    expect(await resolveQuartzNodeModulesPath(quartzPackageRoot)).toBe(path.resolve(quartzPackageRoot, "..", ".."));
+  });
+});
+
+async function createDirectoryTree(relativeDirectories: string[]): Promise<string> {
+  const rootDir = await mkdtemp(path.join(os.tmpdir(), "osp-quartz-runtime-"));
+
+  temporaryDirectories.push(rootDir);
+
+  for (const relativeDirectory of relativeDirectories) {
+    await mkdir(path.join(rootDir, relativeDirectory), { recursive: true });
+  }
+
+  return path.join(rootDir, relativeDirectories.at(-1) ?? "");
+}

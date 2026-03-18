@@ -28,7 +28,7 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
   private readonly previewProcesses = new Map<string, PreviewProcessRecord>();
   private quartzPackageRoot: string | undefined;
 
-  public constructor(private readonly options: QuartzBuilderAdapterOptions = {}) {}
+  public constructor(private readonly options: QuartzBuilderAdapterOptions = {}) { }
 
   public async build(workspace: PreparedWorkspace, config: PublisherConfig): Promise<BuildResult> {
     const startedAt = Date.now();
@@ -171,7 +171,7 @@ function resolveNodeRequire(): NodeJS.Require {
     return nativeRequire;
   }
 
-  return createRequire(import.meta.url);
+  return createRequire(path.join(process.cwd(), "package.json"));
 }
 
 function readNativeRequire(): NodeJS.Require | undefined {

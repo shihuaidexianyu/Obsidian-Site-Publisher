@@ -1,10 +1,12 @@
 import { FileSystemAdapter, Notice, Plugin, PluginSettingTab, Setting, type WorkspaceLeaf } from "obsidian";
 
+import { createBundledPluginRuntimeFactory } from "./bundled-runtime.js";
 import { PluginCommandController } from "./plugin-controller.js";
 import { BuildLogView, BUILD_LOG_VIEW_TYPE, IssueListView, ISSUE_LIST_VIEW_TYPE } from "./plugin-views.js";
 import { pluginManifest, PublisherPluginShell } from "./plugin-shell.js";
 import { loadPluginSettings, savePluginSettings } from "./settings.js";
 
+export * from "./bundled-runtime.js";
 export { pluginManifest } from "./plugin-shell.js";
 export * from "./plugin-controller.js";
 export * from "./plugin-shell.js";
@@ -20,13 +22,18 @@ const deployTargetOptions = [
 ] as const;
 
 export default class ObsidianSitePublisherPlugin extends Plugin {
-  private readonly shell = new PublisherPluginShell();
+  private shell = new PublisherPluginShell();
   private settings = this.shell.createInitialConfig("");
   private statusBarEl?: HTMLElement;
   private controller?: PluginCommandController;
 
   public override async onload(): Promise<void> {
     const vaultRoot = resolveVaultRoot(this);
+
+    this.shell = new PublisherPluginShell(createBundledPluginRuntimeFactory(vaultRoot, {
+      dir: this.manifest.dir,
+      id: this.manifest.id
+    }));
     const loadedSettings = await loadPluginSettings(this, this.shell, vaultRoot);
 
     this.settings = loadedSettings.config;
