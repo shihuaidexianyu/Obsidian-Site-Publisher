@@ -55,7 +55,7 @@ describe("FileSystemStagingService", () => {
       JSON.parse(await readFile(workspace.manifestPath, "utf8")) as unknown
     );
 
-    expect(stagedManifest.notes.map((note) => note.path)).toEqual(["Published.md"]);
+    expect(stagedManifest.notes.map((note) => note.path)).toEqual(["Published.md", "index.md"]);
     expect(stagedManifest.assetFiles).toEqual([{ path: "assets/diagram.png", kind: "image" }]);
     expect(stagedManifest.unsupportedObjects).toEqual([]);
   });
@@ -158,6 +158,51 @@ describe("FileSystemStagingService", () => {
 
     await expectFileToExist(path.join(workspace.contentDir, "Topic", "assets", "diagram.png"));
     await expectFileToExist(path.join(workspace.contentDir, "Legacy", "Guide.assets", "legacy.png"));
+  });
+
+  it("generates a landing page when the published slice has no root index note", async () => {
+    const vaultRoot = await createTempDirectory("osp-staging-home-vault-");
+    const stagingRoot = await createTempDirectory("osp-staging-home-root-");
+
+    await writeVaultFile(vaultRoot, "Guides/Start.md", "# Start\n");
+    await writeVaultFile(vaultRoot, "Guides/Deep Dive.md", "# Deep Dive\n");
+
+    const manifest = createManifest(vaultRoot, {
+      notes: [
+        createNote("Guides/Start.md", {
+          title: "Start Here",
+          slug: "Guides/Start"
+        }),
+        createNote("Guides/Deep Dive.md", {
+          title: "Deep Dive",
+          slug: "Guides/Deep Dive"
+        })
+      ]
+    });
+
+    const workspace = await new FileSystemStagingService().prepare({
+      config: createConfig(vaultRoot, {
+        publishMode: "folder",
+        includeGlobs: ["**/*.md"]
+      }),
+      manifest,
+      mode: "build",
+      stagingRoot
+    });
+
+    await expectFileToExist(path.join(workspace.contentDir, "index.md"));
+    await expect(readFile(path.join(workspace.contentDir, "index.md"), "utf8")).resolves.toContain(
+      "This landing page was generated automatically"
+    );
+    await expect(readFile(path.join(workspace.contentDir, "index.md"), "utf8")).resolves.toContain(
+      "[[Guides/Start|Start Here]]"
+    );
+
+    const stagedManifest = VaultManifestSchema.parse(
+      JSON.parse(await readFile(workspace.manifestPath, "utf8")) as unknown
+    );
+
+    expect(stagedManifest.notes.map((note) => note.path)).toEqual(["Guides/Start.md", "Guides/Deep Dive.md", "index.md"]);
   });
 });
 

@@ -14,13 +14,15 @@ export class FileSystemStagingService implements StagingService {
     const manifestPath = path.join(rootDir, "manifest.json");
     const publishedNotes = selectPublishedNotes(input.manifest, input.config);
     const referencedAssets = collectReferencedAssets(input.manifest, publishedNotes, input.manifest.assetFiles);
-    const stagedManifest = createStagedManifest(input.manifest, publishedNotes, referencedAssets);
+    const generatedHomePage = createGeneratedHomePage(input.config.vaultRoot, publishedNotes);
+    const stagedManifest = createStagedManifest(input.manifest, publishedNotes, referencedAssets, generatedHomePage?.note);
 
     await rm(rootDir, { recursive: true, force: true });
     await mkdir(contentDir, { recursive: true });
     await mkdir(outputDir, { recursive: true });
     await copyVaultFiles(input.config.vaultRoot, contentDir, publishedNotes.map((note) => note.path));
     await copyVaultFiles(input.config.vaultRoot, contentDir, referencedAssets.map((asset) => asset.path));
+    await writeGeneratedHomePage(contentDir, generatedHomePage);
     await writeFile(manifestPath, JSON.stringify(stagedManifest, null, 2), "utf8");
 
     return {
@@ -57,14 +59,82 @@ function collectReferencedAssets(manifest: VaultManifest, notes: NoteRecord[], a
 function createStagedManifest(
   manifest: VaultManifest,
   notes: NoteRecord[],
-  assetFiles: AssetRef[]
+  assetFiles: AssetRef[],
+  generatedHomePageNote?: NoteRecord
 ): VaultManifest {
   return {
     ...manifest,
-    notes,
+    notes: generatedHomePageNote === undefined ? notes : [...notes, generatedHomePageNote],
     assetFiles,
     unsupportedObjects: []
   };
+}
+
+function createGeneratedHomePage(vaultRoot: string, notes: NoteRecord[]): { note: NoteRecord; content: string } | undefined {
+  if (notes.some((note) => normalizeVaultPath(note.path) === "index.md")) {
+    return undefined;
+  }
+
+  const pageTitle = path.basename(vaultRoot) || "Published Vault";
+  const noteLinks = notes
+    .slice()
+    .sort((left, right) => left.path.localeCompare(right.path))
+    .slice(0, 24)
+    .map((note) => `- [[${note.slug}|${note.title}]]`)
+    .join("\n");
+  const remainingCount = Math.max(notes.length - 24, 0);
+  const sections = [
+    "---",
+    `title: ${pageTitle}`,
+    "---",
+    "",
+    `# ${pageTitle}`,
+    "",
+    "This landing page was generated automatically because the published slice does not contain a root `index.md`.",
+    ""
+  ];
+
+  if (noteLinks !== "") {
+    sections.push("## Published Notes", "", noteLinks, "");
+  }
+
+  if (remainingCount > 0) {
+    sections.push(`And ${remainingCount} more published notes are available through tags, search, and folder navigation.`, "");
+  }
+
+  sections.push("- [Browse tags](/tags/)");
+
+  return {
+    note: {
+      id: "__generated__/index.md",
+      path: "index.md",
+      title: pageTitle,
+      slug: "index",
+      aliases: [],
+      headings: [],
+      blockIds: [],
+      properties: {
+        generated: true
+      },
+      links: [],
+      embeds: [],
+      assets: [],
+      publish: true,
+      description: "Generated landing page for a published slice without a root index note."
+    },
+    content: `${sections.join("\n")}\n`
+  };
+}
+
+async function writeGeneratedHomePage(
+  contentDir: string,
+  generatedHomePage: { note: NoteRecord; content: string } | undefined
+): Promise<void> {
+  if (generatedHomePage === undefined) {
+    return;
+  }
+
+  await writeFile(path.join(contentDir, generatedHomePage.note.path), generatedHomePage.content, "utf8");
 }
 
 async function copyVaultFiles(vaultRoot: string, targetRoot: string, relativePaths: string[]): Promise<void> {

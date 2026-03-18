@@ -11,8 +11,10 @@ export type DefaultPublisherRuntime = {
   stop(): Promise<void>;
 };
 
-export function createDefaultPublisherRuntime(): DefaultPublisherRuntime {
-  const builder = new QuartzBuilderAdapter();
+export function createDefaultPublisherRuntime(options?: {
+  builder?: ConstructorParameters<typeof QuartzBuilderAdapter>[0];
+}): DefaultPublisherRuntime {
+  const builder = new QuartzBuilderAdapter(options?.builder);
   const orchestrator = new PublisherOrchestrator({
     parser: new FileSystemVaultParser(),
     diagnostics: new DefaultDiagnosticsEngine(),
