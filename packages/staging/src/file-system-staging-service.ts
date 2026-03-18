@@ -1,7 +1,7 @@
 import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { selectPublishedNotes } from "@osp/shared";
+import { findMatchingAsset, normalizeVaultPath, selectPublishedNotes } from "@osp/shared";
 import type { AssetRef, NoteRecord, PreparedWorkspace, VaultManifest } from "@osp/shared";
 
 import type { PrepareStagingInput, StagingService } from "./contracts.js";
@@ -13,7 +13,7 @@ export class FileSystemStagingService implements StagingService {
     const outputDir = path.join(rootDir, "dist");
     const manifestPath = path.join(rootDir, "manifest.json");
     const publishedNotes = selectPublishedNotes(input.manifest, input.config);
-    const referencedAssets = collectReferencedAssets(publishedNotes, input.manifest.assetFiles);
+    const referencedAssets = collectReferencedAssets(input.manifest, publishedNotes, input.manifest.assetFiles);
     const stagedManifest = createStagedManifest(input.manifest, publishedNotes, referencedAssets);
 
     await rm(rootDir, { recursive: true, force: true });
@@ -33,26 +33,20 @@ export class FileSystemStagingService implements StagingService {
   }
 }
 
-function collectReferencedAssets(notes: NoteRecord[], availableAssets: AssetRef[]): AssetRef[] {
-  const availableAssetsByPath = new Map(availableAssets.map((asset) => [normalizeRelativePath(asset.path) ?? asset.path, asset]));
+function collectReferencedAssets(manifest: VaultManifest, notes: NoteRecord[], availableAssets: AssetRef[]): AssetRef[] {
+  const availableAssetsByPath = new Map(availableAssets.map((asset) => [normalizeVaultPath(asset.path), asset] as const));
   const selectedAssets: AssetRef[] = [];
   const seenPaths = new Set<string>();
 
   for (const note of notes) {
     for (const asset of note.assets) {
-      const resolvedPath = resolveAssetTarget(note.path, asset.path);
+      const matchedAsset = findMatchingAsset(availableAssetsByPath, note.path, asset.path, manifest.vaultSettings);
 
-      if (resolvedPath === undefined || seenPaths.has(resolvedPath)) {
+      if (matchedAsset === undefined || seenPaths.has(matchedAsset.path)) {
         continue;
       }
 
-      const matchedAsset = availableAssetsByPath.get(resolvedPath);
-
-      if (matchedAsset === undefined) {
-        continue;
-      }
-
-      seenPaths.add(resolvedPath);
+      seenPaths.add(matchedAsset.path);
       selectedAssets.push(matchedAsset);
     }
   }
@@ -81,49 +75,6 @@ async function copyVaultFiles(vaultRoot: string, targetRoot: string, relativePat
     await mkdir(path.dirname(destinationPath), { recursive: true });
     await copyFile(sourcePath, destinationPath);
   }
-}
-
-function resolveAssetTarget(sourcePath: string, assetPath: string): string | undefined {
-  const noteTarget = splitAnchor(assetPath);
-  const normalizedTarget = normalizeRelativePath(noteTarget);
-
-  if (normalizedTarget === undefined) {
-    return undefined;
-  }
-
-  if (normalizedTarget.startsWith("/")) {
-    return normalizeRelativePath(normalizedTarget.slice(1));
-  }
-
-  const sourceDirectory = path.posix.dirname(normalizePath(sourcePath));
-  const resolvedPath =
-    sourceDirectory === "." ? path.posix.normalize(normalizedTarget) : path.posix.normalize(path.posix.join(sourceDirectory, normalizedTarget));
-
-  return normalizeRelativePath(resolvedPath);
-}
-
-function splitAnchor(target: string): string {
-  const anchorIndex = target.indexOf("#");
-
-  if (anchorIndex === -1) {
-    return target;
-  }
-
-  return target.slice(0, anchorIndex);
-}
-
-function normalizeRelativePath(targetPath: string | undefined): string | undefined {
-  if (targetPath === undefined) {
-    return undefined;
-  }
-
-  const normalizedPath = normalizePath(targetPath).replace(/\/+$/u, "");
-
-  if (normalizedPath === "" || normalizedPath === "." || normalizedPath === ".." || normalizedPath.startsWith("../")) {
-    return undefined;
-  }
-
-  return normalizedPath;
 }
 
 function normalizePath(targetPath: string): string {

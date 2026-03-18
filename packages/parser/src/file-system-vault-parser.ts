@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-import type { AssetRef, PublisherConfig, UnsupportedObjectRecord, VaultManifest } from "@osp/shared";
+import type { AssetRef, PublisherConfig, UnsupportedObjectRecord, VaultManifest, VaultSettings } from "@osp/shared";
 
 import type { ScanInput, ScanResult, VaultParser } from "./contracts.js";
 import { parseFrontmatterFields } from "./frontmatter.js";
@@ -11,6 +11,7 @@ import { slugify } from "./slug.js";
 export class FileSystemVaultParser implements VaultParser {
   public async scanVault(input: ScanInput): Promise<ScanResult> {
     const scanState = createScanState(input.config);
+    const vaultSettings = await readVaultSettings(input.vaultRoot);
 
     await scanDirectory(input.vaultRoot, input.vaultRoot, scanState);
 
@@ -18,6 +19,7 @@ export class FileSystemVaultParser implements VaultParser {
       manifest: {
         generatedAt: new Date().toISOString(),
         vaultRoot: input.vaultRoot,
+        ...(vaultSettings === undefined ? {} : { vaultSettings }),
         notes: scanState.notes,
         assetFiles: scanState.assetFiles,
         unsupportedObjects: scanState.unsupportedObjects
@@ -143,6 +145,24 @@ function createIgnoredRelativePrefixes(config: PublisherConfig): string[] {
   }
 
   return prefixes.map(normalizePath);
+}
+
+async function readVaultSettings(vaultRoot: string): Promise<VaultSettings | undefined> {
+  const appJsonPath = path.join(vaultRoot, ".obsidian", "app.json");
+
+  try {
+    const parsed = JSON.parse(await readFile(appJsonPath, "utf8")) as { attachmentFolderPath?: unknown };
+
+    if (typeof parsed.attachmentFolderPath !== "string") {
+      return undefined;
+    }
+
+    return {
+      attachmentFolderPath: parsed.attachmentFolderPath
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function toOptionalRelativeVaultPath(vaultRoot: string, targetPath: string): string | undefined {

@@ -1,9 +1,12 @@
-import type { BuildIssue, VaultManifest } from "@osp/shared";
+import { findMatchingAsset, normalizeVaultPath } from "@osp/shared";
+import type { AssetRef, BuildIssue, VaultManifest } from "@osp/shared";
 
-import { normalizePath, resolveAssetTarget } from "./reference-resolution.js";
+import { normalizePath } from "./reference-resolution.js";
 
 export function analyzeMissingAssets(manifest: VaultManifest, sourceNotePaths?: ReadonlySet<string>): BuildIssue[] {
-  const availableAssets = new Set(manifest.assetFiles.map((asset) => normalizePath(asset.path)));
+  const availableAssets = new Map<string, AssetRef>(
+    manifest.assetFiles.map((asset) => [normalizeVaultPath(asset.path), asset] as const)
+  );
   const issues: BuildIssue[] = [];
 
   for (const note of manifest.notes) {
@@ -12,9 +15,7 @@ export function analyzeMissingAssets(manifest: VaultManifest, sourceNotePaths?: 
     }
 
     for (const asset of note.assets) {
-      const resolvedAssetPath = resolveAssetTarget(note.path, asset.path);
-
-      if (availableAssets.has(resolvedAssetPath)) {
+      if (findMatchingAsset(availableAssets, note.path, asset.path, manifest.vaultSettings) !== undefined) {
         continue;
       }
 

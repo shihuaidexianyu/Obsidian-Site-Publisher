@@ -50,6 +50,10 @@ export type AssetRef = {
   kind: "image" | "audio" | "video" | "pdf" | "other";
 };
 
+export type VaultSettings = {
+  attachmentFolderPath?: string;
+};
+
 export type UnsupportedObjectRecord = {
   kind: UnsupportedObjectKind;
   path: string;
@@ -76,6 +80,7 @@ export type NoteRecord = {
 export type VaultManifest = {
   generatedAt: string;
   vaultRoot: string;
+  vaultSettings?: VaultSettings;
   notes: NoteRecord[];
   assetFiles: AssetRef[];
   unsupportedObjects: UnsupportedObjectRecord[];

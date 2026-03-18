@@ -39,6 +39,10 @@ export const AssetRefSchema = z.object({
   kind: z.enum(["image", "audio", "video", "pdf", "other"])
 });
 
+export const VaultSettingsSchema = z.object({
+  attachmentFolderPath: z.string().optional()
+});
+
 export const UnsupportedObjectRecordSchema = z.object({
   kind: z.enum(unsupportedObjectKinds),
   path: z.string()
@@ -65,6 +69,7 @@ export const NoteRecordSchema = z.object({
 export const VaultManifestSchema = z.object({
   generatedAt: z.string(),
   vaultRoot: z.string(),
+  vaultSettings: VaultSettingsSchema.optional(),
   notes: z.array(NoteRecordSchema),
   assetFiles: z.array(AssetRefSchema),
   unsupportedObjects: z.array(UnsupportedObjectRecordSchema)

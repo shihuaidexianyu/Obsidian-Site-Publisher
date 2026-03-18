@@ -118,6 +118,47 @@ describe("FileSystemStagingService", () => {
     await expectFileToBeMissing(path.join(workspace.contentDir, "Public", "Drafts", "Skip.md"));
     await expectFileToBeMissing(path.join(workspace.contentDir, "Private", "Skip.md"));
   });
+
+  it("copies assets resolved through attachment folders and sibling .assets directories", async () => {
+    const vaultRoot = await createTempDirectory("osp-staging-assets-vault-");
+    const stagingRoot = await createTempDirectory("osp-staging-assets-root-");
+
+    await writeVaultFile(vaultRoot, "Topic/Guide.md", "![[diagram.png]]\n");
+    await writeVaultFile(vaultRoot, "Topic/assets/diagram.png", "fake-png");
+    await writeVaultFile(vaultRoot, "Legacy/Guide.md", "![legacy](legacy.png)\n");
+    await writeVaultFile(vaultRoot, "Legacy/Guide.assets/legacy.png", "legacy-png");
+
+    const manifest = createManifest(vaultRoot, {
+      vaultSettings: {
+        attachmentFolderPath: "./assets"
+      },
+      notes: [
+        createNote("Topic/Guide.md", {
+          assets: [{ path: "diagram.png", kind: "image" }]
+        }),
+        createNote("Legacy/Guide.md", {
+          assets: [{ path: "legacy.png", kind: "image" }]
+        })
+      ],
+      assetFiles: [
+        { path: "Topic/assets/diagram.png", kind: "image" },
+        { path: "Legacy/Guide.assets/legacy.png", kind: "image" }
+      ]
+    });
+
+    const workspace = await new FileSystemStagingService().prepare({
+      config: createConfig(vaultRoot, {
+        publishMode: "folder",
+        includeGlobs: ["**/*.md"]
+      }),
+      manifest,
+      mode: "build",
+      stagingRoot
+    });
+
+    await expectFileToExist(path.join(workspace.contentDir, "Topic", "assets", "diagram.png"));
+    await expectFileToExist(path.join(workspace.contentDir, "Legacy", "Guide.assets", "legacy.png"));
+  });
 });
 
 function createConfig(
@@ -140,16 +181,14 @@ function createConfig(
   };
 }
 
-function createManifest(
-  vaultRoot: string,
-  overrides: Pick<VaultManifest, "notes" | "assetFiles">
-): VaultManifest {
+function createManifest(vaultRoot: string, overrides: Partial<VaultManifest>): VaultManifest {
   return {
     generatedAt: "2026-03-18T00:00:00.000Z",
     vaultRoot,
-    notes: overrides.notes,
-    assetFiles: overrides.assetFiles,
-    unsupportedObjects: []
+    notes: [],
+    assetFiles: [],
+    unsupportedObjects: [],
+    ...overrides
   };
 }
 

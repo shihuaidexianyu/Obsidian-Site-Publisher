@@ -152,6 +152,7 @@ describe("FileSystemVaultParser", () => {
     await mkdir(path.join(vaultRoot, "assets"), { recursive: true });
     await writeFile(path.join(vaultRoot, "Visible.md"), "# Visible", "utf8");
     await writeFile(path.join(vaultRoot, ".git", "HEAD"), "ref: refs/heads/main", "utf8");
+    await writeFile(path.join(vaultRoot, ".obsidian", "app.json"), '{"attachmentFolderPath":"./assets"}', "utf8");
     await writeFile(path.join(vaultRoot, ".obsidian", "Hidden.md"), "# Hidden", "utf8");
     await writeFile(path.join(vaultRoot, ".osp", "build", "content", "Stale.md"), "# Stale", "utf8");
     await writeFile(path.join(vaultRoot, ".trash", "Deleted.md"), "# Deleted", "utf8");
@@ -171,6 +172,9 @@ describe("FileSystemVaultParser", () => {
         kind: "image"
       }
     ]);
+    expect(result.manifest.vaultSettings).toEqual({
+      attachmentFolderPath: "./assets"
+    });
     expect(result.manifest.unsupportedObjects).toEqual([]);
   });
 
