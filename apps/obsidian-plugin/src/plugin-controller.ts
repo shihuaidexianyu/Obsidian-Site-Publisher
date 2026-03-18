@@ -54,7 +54,6 @@ export class PluginCommandController {
 
     if (result.command === "build" || result.command === "publish") {
       await this.host.revealIssueListView();
-      await this.host.revealBuildLogView();
     }
 
     this.host.refreshViews();

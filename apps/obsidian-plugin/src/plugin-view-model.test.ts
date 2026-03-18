@@ -47,6 +47,7 @@ describe("plugin view model", () => {
     const state = createState({
       lastCommand: "build",
       lastUpdatedAt: "2026-03-18T13:05:00.000Z",
+      lastLogPath: "D:/vault/.osp/logs/build.log",
       lastLogs: [
         {
           level: "warning",
@@ -58,8 +59,8 @@ describe("plugin view model", () => {
 
     expect(createLogPanelMeta(state)).toEqual({
       title: "构建日志",
-      summary: "最近一次结果里记录了 1 条日志 | 最近命令：构建 | 更新时间：2026-03-18T13:05:00.000Z",
-      emptyMessage: "运行“构建站点”或“发布站点”后，可在这里查看结构化日志。"
+      summary: "侧栏仅显示最近 1 条日志 | 完整日志：D:/vault/.osp/logs/build.log | 最近命令：构建 | 更新时间：2026-03-18T13:05:00.000Z",
+      emptyMessage: "运行“构建站点”或“发布站点”后，可在这里查看日志摘要；完整内容在日志文件里。"
     });
     expect(createLogPanelItems(state)).toEqual([
       {

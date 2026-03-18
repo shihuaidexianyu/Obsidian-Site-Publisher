@@ -1,6 +1,10 @@
 import type { BuildIssue, BuildLogEntry, BuildResult, DeployResult, PreviewSession, PublisherConfig, VaultManifest } from "@osp/shared";
 
-import type { PluginExecutionBackend, PluginPublishResult, PluginScanResult } from "./plugin-backend.js";
+import type {
+  PluginExecutionBackend,
+  PluginPublishResult,
+  PluginScanResult
+} from "./plugin-backend.js";
 
 export const pluginManifest = {
   id: "obsidian-site-publisher",
@@ -19,6 +23,7 @@ export type PluginExecutionState = {
   lastCommand?: PluginCommand | undefined;
   lastUpdatedAt?: string | undefined;
   statusMessage?: string | undefined;
+  lastLogPath?: string | undefined;
   lastManifest?: VaultManifest | undefined;
   lastIssues: BuildIssue[];
   lastLogs: BuildLogEntry[];
@@ -55,6 +60,8 @@ const defaultState: PluginExecutionState = {
   lastIssues: [],
   lastLogs: []
 };
+
+const maxStoredLogEntries = 40;
 
 export class PublisherPluginShell {
   private state: PluginExecutionState = defaultState;
@@ -123,6 +130,7 @@ export class PublisherPluginShell {
     this.updateState({
       lastCommand: "issues",
       statusMessage,
+      lastLogPath: report.logPath,
       lastManifest: report.manifest,
       lastIssues: report.issues,
       lastLogs: [],
@@ -140,14 +148,16 @@ export class PublisherPluginShell {
   }
 
   private async runBuildCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "build" }>> {
-    const result = await backend.build(config);
+    const build = await backend.build(config);
+    const result = build.result;
     const statusMessage = result.success ? "站点构建完成。" : "站点构建失败，请检查问题和日志。";
 
     this.updateState({
       lastCommand: "build",
       statusMessage,
+      lastLogPath: build.logPath,
       lastIssues: result.issues,
-      lastLogs: result.logs,
+      lastLogs: retainRecentLogs(result.logs),
       lastBuildResult: result,
       lastPreviewSession: undefined,
       lastDeployResult: undefined
@@ -166,13 +176,15 @@ export class PublisherPluginShell {
     const backend = this.createBackend();
 
     try {
-      const session = await backend.preview(config);
+      const preview = await backend.preview(config);
+      const session = preview.session;
       const statusMessage = `站点预览已启动：${session.url}`;
 
       this.activePreviewBackend = backend;
       this.updateState({
         lastCommand: "preview",
         statusMessage,
+        lastLogPath: preview.logPath,
         lastIssues: this.state.lastIssues,
         lastLogs: [],
         lastBuildResult: undefined,
@@ -192,7 +204,8 @@ export class PublisherPluginShell {
   }
 
   private async runPublishCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "publish" }>> {
-    const { build, deploy } = await backend.publish(config);
+    const publishResult = await backend.publish(config);
+    const { build, deploy } = publishResult;
 
     if (!build.success) {
       const statusMessage = "发布已停止，因为构建没有成功。";
@@ -200,8 +213,9 @@ export class PublisherPluginShell {
       this.updateState({
         lastCommand: "publish",
         statusMessage,
+        lastLogPath: publishResult.logPath,
         lastIssues: build.issues,
-        lastLogs: build.logs,
+        lastLogs: retainRecentLogs(build.logs),
         lastBuildResult: build,
         lastPreviewSession: undefined,
         lastDeployResult: undefined
@@ -224,8 +238,9 @@ export class PublisherPluginShell {
     this.updateState({
       lastCommand: "publish",
       statusMessage,
+      lastLogPath: publishResult.logPath,
       lastIssues: build.issues,
-      lastLogs: build.logs,
+      lastLogs: retainRecentLogs(build.logs),
       lastBuildResult: build,
       lastPreviewSession: undefined,
       lastDeployResult: deploy
@@ -269,6 +284,10 @@ export class PublisherPluginShell {
   }
 }
 
+function retainRecentLogs(logs: BuildLogEntry[]): BuildLogEntry[] {
+  return logs.slice(-maxStoredLogEntries);
+}
+
 function createUnavailableBackend(): PluginExecutionBackend {
   const createError = (): Error => new Error("插件尚未配置外部 publisher-cli。");
 
@@ -276,10 +295,10 @@ function createUnavailableBackend(): PluginExecutionBackend {
     async scan(): Promise<PluginScanResult> {
       throw createError();
     },
-    async build(): Promise<BuildResult> {
+    async build() {
       throw createError();
     },
-    async preview(): Promise<PreviewSession> {
+    async preview() {
       throw createError();
     },
     async publish(): Promise<PluginPublishResult> {

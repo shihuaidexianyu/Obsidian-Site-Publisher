@@ -32,8 +32,9 @@ describe("CliPluginBackend", () => {
 
     const result = await backend.build(createConfig(pluginRoot));
 
-    expect(result.success).toBe(true);
-    expect(result.outputDir).toBe(path.join(pluginRoot, ".osp", "dist"));
+    expect(result.result.success).toBe(true);
+    expect(result.result.outputDir).toBe(path.join(pluginRoot, ".osp", "dist"));
+    expect(result.logPath).toBe(path.join(pluginRoot, ".osp", "logs", "build.log"));
   });
 
   it("keeps preview alive until the backend is disposed", async () => {
@@ -47,9 +48,10 @@ describe("CliPluginBackend", () => {
       logDirectory: path.join(pluginRoot, ".osp", "logs")
     });
 
-    const session = await backend.preview(createConfig(pluginRoot));
+    const preview = await backend.preview(createConfig(pluginRoot));
 
-    expect(session.url).toBe("http://127.0.0.1:43180");
+    expect(preview.session.url).toBe("http://127.0.0.1:43180");
+    expect(preview.logPath).toBe(path.join(pluginRoot, ".osp", "logs", "preview.log"));
 
     await backend.dispose();
   });

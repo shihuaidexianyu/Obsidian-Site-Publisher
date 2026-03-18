@@ -21,6 +21,8 @@ export type LogPanelItem = {
   message: string;
 };
 
+const maxVisibleLogEntries = 40;
+
 export function createIssuePanelMeta(state: PluginExecutionState): PanelMeta {
   return {
     title: "发布问题",
@@ -46,15 +48,18 @@ export function createIssuePanelItems(state: PluginExecutionState): IssuePanelIt
 }
 
 export function createLogPanelMeta(state: PluginExecutionState): PanelMeta {
+  const displayedCount = Math.min(state.lastLogs.length, maxVisibleLogEntries);
+  const logPathSummary = state.lastLogPath === undefined ? "完整日志请查看 CLI 日志目录。" : `完整日志：${state.lastLogPath}`;
+
   return {
     title: "构建日志",
-    summary: createSummaryText(state, `最近一次结果里记录了 ${state.lastLogs.length} 条日志`),
-    emptyMessage: "运行“构建站点”或“发布站点”后，可在这里查看结构化日志。"
+    summary: createSummaryText(state, `侧栏仅显示最近 ${displayedCount} 条日志 | ${logPathSummary}`),
+    emptyMessage: "运行“构建站点”或“发布站点”后，可在这里查看日志摘要；完整内容在日志文件里。"
   };
 }
 
 export function createLogPanelItems(state: PluginExecutionState): LogPanelItem[] {
-  return state.lastLogs.map((entry) => ({
+  return state.lastLogs.slice(-maxVisibleLogEntries).map((entry) => ({
     badge: entry.level.toUpperCase(),
     timestamp: formatTimestamp(entry),
     message: entry.message

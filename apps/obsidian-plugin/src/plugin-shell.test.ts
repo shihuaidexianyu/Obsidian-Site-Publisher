@@ -30,6 +30,7 @@ describe("PublisherPluginShell", () => {
     const backend = createBackend({
       scanResult: {
         manifest: createManifest("/vault"),
+        logPath: "/vault/.osp/logs/scan.log",
         issues: [
           {
             code: "BROKEN_LINK",
@@ -48,6 +49,7 @@ describe("PublisherPluginShell", () => {
     expect(backend.scan).toHaveBeenCalledOnce();
     expect(plugin.getState()).toMatchObject({
       lastCommand: "issues",
+      lastLogPath: "/vault/.osp/logs/scan.log",
       lastIssues: [
         {
           code: "BROKEN_LINK"
@@ -59,15 +61,18 @@ describe("PublisherPluginShell", () => {
 
   it("runs build through core and stores logs for later UI rendering", async () => {
     const backend = createBackend({
-      buildResult: createBuildResult({
-        logs: [
-          {
-            level: "info",
-            message: "Quartz build finished.",
-            timestamp: new Date().toISOString()
-          }
-        ]
-      })
+      buildResult: {
+        logPath: "/vault/.osp/logs/build.log",
+        result: createBuildResult({
+          logs: [
+            {
+              level: "info",
+              message: "Quartz build finished.",
+              timestamp: new Date().toISOString()
+            }
+          ]
+        })
+      }
     });
     const plugin = new PublisherPluginShell(() => backend);
 
@@ -77,6 +82,7 @@ describe("PublisherPluginShell", () => {
     expect(backend.build).toHaveBeenCalledOnce();
     expect(plugin.getState()).toMatchObject({
       lastCommand: "build",
+      lastLogPath: "/vault/.osp/logs/build.log",
       lastLogs: [
         {
           message: "Quartz build finished."
@@ -87,7 +93,12 @@ describe("PublisherPluginShell", () => {
   });
 
   it("runs preview through core and stores the last preview session", async () => {
-    const backend = createBackend();
+    const backend = createBackend({
+      previewResult: {
+        logPath: "/vault/.osp/logs/preview.log",
+        session: createPreviewSession()
+      }
+    });
     const plugin = new PublisherPluginShell(() => backend);
 
     const result = await plugin.runCommand("preview", createConfig("/vault"));
@@ -96,6 +107,7 @@ describe("PublisherPluginShell", () => {
     expect(backend.preview).toHaveBeenCalledOnce();
     expect(plugin.getState()).toMatchObject({
       lastCommand: "preview",
+      lastLogPath: "/vault/.osp/logs/preview.log",
       lastPreviewSession: {
         url: "http://localhost:8080"
       }
@@ -105,17 +117,21 @@ describe("PublisherPluginShell", () => {
 
   it("stops the previous preview before starting a new one", async () => {
     const firstBackend = createBackend({
-      previewSession: {
-        url: "http://localhost:8080",
-        workspaceRoot: "/vault/.osp/preview-a",
-        startedAt: new Date().toISOString()
+      previewResult: {
+        session: {
+          url: "http://localhost:8080",
+          workspaceRoot: "/vault/.osp/preview-a",
+          startedAt: new Date().toISOString()
+        }
       }
     });
     const secondBackend = createBackend({
-      previewSession: {
-        url: "http://localhost:8081",
-        workspaceRoot: "/vault/.osp/preview-b",
-        startedAt: new Date().toISOString()
+      previewResult: {
+        session: {
+          url: "http://localhost:8081",
+          workspaceRoot: "/vault/.osp/preview-b",
+          startedAt: new Date().toISOString()
+        }
       }
     });
     const plugin = new PublisherPluginShell(vi.fn().mockReturnValueOnce(firstBackend).mockReturnValueOnce(secondBackend));
@@ -138,7 +154,13 @@ describe("PublisherPluginShell", () => {
   });
 
   it("runs publish as build plus deploy and stores the deploy result", async () => {
-    const backend = createBackend();
+    const backend = createBackend({
+      publishResult: {
+        logPath: "/vault/.osp/logs/deploy.log",
+        build: createBuildResult(),
+        deploy: createDeployResult()
+      }
+    });
     const plugin = new PublisherPluginShell(() => backend);
 
     const result = await plugin.runCommand("publish", createConfig("/vault"));
@@ -147,6 +169,7 @@ describe("PublisherPluginShell", () => {
     expect(backend.publish).toHaveBeenCalledOnce();
     expect(plugin.getState()).toMatchObject({
       lastCommand: "publish",
+      lastLogPath: "/vault/.osp/logs/deploy.log",
       lastDeployResult: {
         success: true
       },
@@ -156,9 +179,12 @@ describe("PublisherPluginShell", () => {
 
   it("does not deploy when publish build fails", async () => {
     const backend = createBackend({
-      buildResult: createBuildResult({
-        success: false
-      })
+      publishResult: {
+        logPath: "/vault/.osp/logs/deploy.log",
+        build: createBuildResult({
+          success: false
+        })
+      }
     });
     const plugin = new PublisherPluginShell(() => backend);
 
@@ -171,25 +197,19 @@ describe("PublisherPluginShell", () => {
 });
 
 function createBackend(options: {
-  scanResult?: { manifest: VaultManifest; issues: BuildResult["issues"] };
-  buildResult?: BuildResult;
-  previewSession?: PreviewSession;
-  deployResult?: DeployResult;
+  scanResult?: { manifest: VaultManifest; issues: BuildResult["issues"]; logPath?: string };
+  buildResult?: { result: BuildResult; logPath?: string };
+  previewResult?: { session: PreviewSession; logPath?: string };
+  publishResult?: { build: BuildResult; deploy?: DeployResult; logPath?: string };
 } = {}): PluginExecutionBackend & { dispose: ReturnType<typeof vi.fn> } {
   return {
     scan: vi.fn(async () => options.scanResult ?? { manifest: createManifest("/vault"), issues: [] }),
-    build: vi.fn(async () => options.buildResult ?? createBuildResult()),
-    preview: vi.fn(async () => options.previewSession ?? createPreviewSession()),
-    publish: vi.fn(async () =>
-      options.buildResult?.success === false
-        ? {
-            build: options.buildResult
-          }
-        : {
-            build: options.buildResult ?? createBuildResult(),
-            deploy: options.deployResult ?? createDeployResult()
-          }
-    ),
+    build: vi.fn(async () => options.buildResult ?? { result: createBuildResult() }),
+    preview: vi.fn(async () => options.previewResult ?? { session: createPreviewSession() }),
+    publish: vi.fn(async () => options.publishResult ?? {
+      build: createBuildResult(),
+      deploy: createDeployResult()
+    }),
     dispose: vi.fn(async () => {})
   };
 }

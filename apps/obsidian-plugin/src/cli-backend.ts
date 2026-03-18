@@ -21,7 +21,14 @@ import {
   enrichCliLaunchError,
   stopChildProcess
 } from "./cli-process.js";
-import type { PluginExecutionBackend, PluginPublishResult, PluginScanResult } from "./plugin-backend.js";
+import { tryParseCliPayload } from "./cli-json.js";
+import type {
+  PluginBuildResult,
+  PluginExecutionBackend,
+  PluginPreviewResult,
+  PluginPublishResult,
+  PluginScanResult
+} from "./plugin-backend.js";
 type CliBackendOptions = {
   cliCommand: string;
   logDirectory?: string;
@@ -49,17 +56,21 @@ export class CliPluginBackend implements PluginExecutionBackend {
 
     return {
       manifest: payload.manifest as PluginScanResult["manifest"],
-      issues: payload.issues as PluginScanResult["issues"]
+      issues: payload.issues as PluginScanResult["issues"],
+      logPath: payload.logPath
     };
   }
 
-  public async build(config: PublisherConfig): Promise<BuildResult> {
+  public async build(config: PublisherConfig): Promise<PluginBuildResult> {
     const payload = await this.runOneShotCommand("build", config, CliBuildResultSchema);
 
-    return payload.result as BuildResult;
+    return {
+      result: payload.result as BuildResult,
+      logPath: payload.logPath
+    };
   }
 
-  public async preview(config: PublisherConfig): Promise<PreviewSession> {
+  public async preview(config: PublisherConfig): Promise<PluginPreviewResult> {
     await this.stopActivePreview();
 
     const cliCommand = this.options.cliCommand;
@@ -96,7 +107,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
     });
 
     try {
-      const session = await new Promise<PreviewSession>((resolve, reject) => {
+      const previewResult = await new Promise<PluginPreviewResult>((resolve, reject) => {
         const resolveIfReady = (): void => {
           const payload = tryParseCliPayload(stdout, CliPreviewResultSchema);
 
@@ -105,7 +116,10 @@ export class CliPluginBackend implements PluginExecutionBackend {
           }
 
           previewResolved = true;
-          resolve(payload.session);
+          resolve({
+            session: payload.session,
+            logPath: payload.logPath
+          });
         };
 
         stdoutStream.on("data", resolveIfReady);
@@ -132,7 +146,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
         })
       };
 
-      return session;
+      return previewResult;
     } catch (error) {
       await stopChildProcess(child);
       await exitState.catch(() => undefined);
@@ -146,13 +160,15 @@ export class CliPluginBackend implements PluginExecutionBackend {
 
     if (payload.deploy === undefined) {
       return {
-        build: payload.build as BuildResult
+        build: payload.build as BuildResult,
+        logPath: payload.logPath
       };
     }
 
     return {
       build: payload.build as BuildResult,
-      deploy: payload.deploy as NonNullable<PluginPublishResult["deploy"]>
+      deploy: payload.deploy as NonNullable<PluginPublishResult["deploy"]>,
+      logPath: payload.logPath
     };
   }
 
@@ -328,27 +344,4 @@ function buildCommandLine(command: string, args: string[]): string {
 
 function quoteShellArgument(argument: string): string {
   return /[\s"]/u.test(argument) ? `"${argument.replace(/"/g, '\\"')}"` : argument;
-}
-
-function tryParseCliPayload<TSchema extends z.ZodTypeAny>(stdout: string, schema: TSchema): z.output<TSchema> | undefined {
-  const lines = stdout
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line !== "");
-
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const candidate = lines[index];
-
-    if (candidate === undefined) {
-      continue;
-    }
-
-    try {
-      return schema.parse(JSON.parse(candidate)) as z.output<TSchema>;
-    } catch {
-      // Keep scanning older lines until we find the JSON payload.
-    }
-  }
-
-  return undefined;
 }
