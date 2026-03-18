@@ -77,6 +77,7 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
       [this.getBootstrapCliPath(workspace), ...this.createPreviewArgs(workspace, port, wsPort)],
       {
         cwd: workspace.rootDir,
+        env: createQuartzChildProcessEnv(),
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true
       }
@@ -182,6 +183,13 @@ function readNativeRequire(): NodeJS.Require | undefined {
   }
 }
 
+function createQuartzChildProcessEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    ELECTRON_RUN_AS_NODE: "1"
+  };
+}
+
 async function runQuartzCommand(input: {
   args: string[];
   bootstrapCliPath: string;
@@ -197,6 +205,7 @@ async function runQuartzCommand(input: {
   ];
   const child = spawn(process.execPath, [input.bootstrapCliPath, ...input.args], {
     cwd: input.cwd,
+    env: createQuartzChildProcessEnv(),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true
   });
