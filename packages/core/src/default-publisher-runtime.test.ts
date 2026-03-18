@@ -1,4 +1,4 @@
-import { access, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -43,9 +43,55 @@ describe("createDefaultPublisherRuntime", () => {
     },
     60_000
   );
+
+  it(
+    "deploys a built site through the default local export adapter",
+    async () => {
+      const vaultRoot = await createTempVault();
+      const deployOutputDir = path.join(vaultRoot, ".published-site");
+
+      await writeVaultFile(
+        vaultRoot,
+        "index.md",
+        ["---", "publish: true", "---", "", "# Home", "", "Welcome to the deployed site."].join("\n")
+      );
+
+      const runtime = createDefaultPublisherRuntime();
+
+      try {
+        const build = await runtime.orchestrator.build(
+          createConfig(vaultRoot, {
+            deployTarget: "local-export",
+            deployOutputDir
+          })
+        );
+        const deploy = await runtime.orchestrator.deployFromBuild(
+          build,
+          createConfig(vaultRoot, {
+            deployTarget: "local-export",
+            deployOutputDir
+          })
+        );
+
+        expect(deploy).toEqual({
+          success: true,
+          target: "local-export",
+          destination: deployOutputDir,
+          message: "Local export completed successfully."
+        });
+        await expect(access(path.join(deployOutputDir, "index.html"))).resolves.toBeUndefined();
+        await expect(readFile(path.join(deployOutputDir, "index.html"), "utf8")).resolves.toContain(
+          "Welcome to the deployed site."
+        );
+      } finally {
+        await runtime.stop();
+      }
+    },
+    60_000
+  );
 });
 
-function createConfig(vaultRoot: string): PublisherConfig {
+function createConfig(vaultRoot: string, overrides: Partial<PublisherConfig> = {}): PublisherConfig {
   return {
     vaultRoot,
     publishMode: "frontmatter",
@@ -57,7 +103,8 @@ function createConfig(vaultRoot: string): PublisherConfig {
     enableSearch: true,
     enableBacklinks: true,
     enableGraph: true,
-    strictMode: false
+    strictMode: false,
+    ...overrides
   };
 }
 

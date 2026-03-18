@@ -109,12 +109,14 @@ export async function resolveCliConfig(options: CliOptions, cwd: string): Promis
       : resolveConfiguredPath(configBaseDir, configFileInput.vaultRoot) ?? cwd;
   const defaultConfig = createDefaultConfig(resolvedVaultRoot);
   const resolvedOutputDir = resolveConfiguredPath(configBaseDir, configFileInput.outputDir);
+  const resolvedDeployOutputDir = resolveConfiguredPath(configBaseDir, configFileInput.deployOutputDir);
 
   const config = PublisherConfigSchema.parse({
     ...defaultConfig,
     ...configFileInput,
     vaultRoot: resolvedVaultRoot,
-    ...(resolvedOutputDir === undefined ? {} : { outputDir: resolvedOutputDir })
+    ...(resolvedOutputDir === undefined ? {} : { outputDir: resolvedOutputDir }),
+    ...(resolvedDeployOutputDir === undefined ? {} : { deployOutputDir: resolvedDeployOutputDir })
   }) as PublisherConfig;
 
   return {

@@ -1,5 +1,5 @@
 import { QuartzBuilderAdapter } from "@osp/builder-adapter-quartz";
-import { NoopDeployAdapter } from "@osp/deploy-adapters";
+import { DefaultDeployAdapter } from "@osp/deploy-adapters";
 import { DefaultDiagnosticsEngine } from "@osp/diagnostics";
 import { FileSystemVaultParser } from "@osp/parser";
 import { FileSystemStagingService } from "@osp/staging";
@@ -18,7 +18,7 @@ export function createDefaultPublisherRuntime(): DefaultPublisherRuntime {
     diagnostics: new DefaultDiagnosticsEngine(),
     staging: new FileSystemStagingService(),
     builder,
-    deploy: new NoopDeployAdapter()
+    deploy: new DefaultDeployAdapter()
   });
 
   return {

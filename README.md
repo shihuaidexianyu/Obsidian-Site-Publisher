@@ -20,6 +20,12 @@ The repository now contains the scaffold described in [todo.md](/c:/Users/exqin/
 - `docs/adr`: architecture decision records
 - `docs/prompts`: vibe-coding guardrails and task templates
 
+Real pipeline status today:
+
+- scan / diagnose / stage / build / preview are wired through the default runtime
+- plugin and CLI both call the same `@osp/core` orchestration path
+- deploy now has a real `local-export` target that copies a successful build into a dedicated output directory
+
 ## Engineering Guardrails
 
 The main collaboration constraints live in:

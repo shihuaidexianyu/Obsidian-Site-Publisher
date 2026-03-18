@@ -60,7 +60,9 @@ describe("runCli", () => {
         {
           publishMode: "folder",
           publishRoot: "Public",
-          strictMode: true
+          strictMode: true,
+          deployTarget: "local-export",
+          deployOutputDir: "./exports/site"
         },
         null,
         2
@@ -80,7 +82,9 @@ describe("runCli", () => {
         vaultRoot: cwd,
         publishMode: "folder",
         publishRoot: "Public",
-        strictMode: true
+        strictMode: true,
+        deployTarget: "local-export",
+        deployOutputDir: path.join(cwd, "exports", "site")
       })
     );
     expect(output.logs.join("\n")).toContain("Using config");

@@ -4,7 +4,7 @@ export type PublishMode = "folder" | "frontmatter";
 
 export type BuilderKind = "quartz";
 
-export type DeployTarget = "none" | "git-branch" | "github-pages";
+export type DeployTarget = "none" | "local-export" | "git-branch" | "github-pages";
 
 export type IssueCode =
   | "BROKEN_LINK"
@@ -104,6 +104,7 @@ export type PublisherConfig = {
   outputDir: string;
   builder: BuilderKind;
   deployTarget: DeployTarget;
+  deployOutputDir?: string;
   enableSearch: boolean;
   enableBacklinks: boolean;
   enableGraph: boolean;

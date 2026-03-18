@@ -14,7 +14,7 @@ export const unsupportedObjectKinds = ["canvas", "base"] as const;
 
 export const builderKinds = ["quartz"] as const;
 
-export const deployTargets = ["none", "git-branch", "github-pages"] as const;
+export const deployTargets = ["none", "local-export", "git-branch", "github-pages"] as const;
 
 export const publishModes = ["folder", "frontmatter"] as const;
 
