@@ -3,11 +3,14 @@ import { PluginSettingTab, Setting, type Plugin } from "obsidian";
 
 import {
   deployTargetOptions,
+  formatGlobList,
   normalizeDeployTarget,
+  updateGlobListSetting,
   updateOptionalCliSetting,
   updateOptionalConfigValue,
   updatePreviewPortSetting
 } from "./plugin-settings-helpers.js";
+import { addMultiLineTextSetting, addOptionalTextSetting, addToggleSetting } from "./plugin-settings-fields.js";
 import type { PublisherPluginSettings } from "./settings.js";
 
 type PluginSettingsHost = Plugin & {
@@ -59,6 +62,34 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
         await this.plugin.updateSettingsWith((currentSettings) => ({
           ...currentSettings,
           config: updateOptionalConfigValue(currentSettings.config, "publishRoot", value)
+        }));
+      }
+    );
+
+    addMultiLineTextSetting(
+      containerEl,
+      "只包含这些路径",
+      "按行填写要纳入站点的路径规则。可填写目录或 glob，例如 `课程笔记/**/*.md`、`科研/**`。",
+      formatGlobList(config.includeGlobs),
+      "课程笔记/**/*.md",
+      async (value) => {
+        await this.plugin.updateSettingsWith((currentSettings) => ({
+          ...currentSettings,
+          config: updateGlobListSetting(currentSettings.config, "includeGlobs", value)
+        }));
+      }
+    );
+
+    addMultiLineTextSetting(
+      containerEl,
+      "排除这些路径",
+      "按行填写要从站点中隐藏的路径规则。适合排除整个文件夹，例如 `日记/**`、`科研/草稿/**`。",
+      formatGlobList(config.excludeGlobs),
+      "**/.obsidian/**",
+      async (value) => {
+        await this.plugin.updateSettingsWith((currentSettings) => ({
+          ...currentSettings,
+          config: updateGlobListSetting(currentSettings.config, "excludeGlobs", value)
         }));
       }
     );
@@ -235,42 +266,4 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
       }));
     });
   }
-}
-
-function addToggleSetting(
-  containerEl: HTMLElement,
-  name: string,
-  description: string,
-  value: boolean,
-  onChange: (value: boolean) => Promise<void>
-): void {
-  new Setting(containerEl)
-    .setName(name)
-    .setDesc(description)
-    .addToggle((toggle) => {
-      toggle.setValue(value);
-      toggle.onChange(async (nextValue) => {
-        await onChange(nextValue);
-      });
-    });
-}
-
-function addOptionalTextSetting(
-  containerEl: HTMLElement,
-  name: string,
-  description: string,
-  value: string | undefined,
-  placeholder: string,
-  onChange: (value: string) => Promise<void>
-): void {
-  new Setting(containerEl)
-    .setName(name)
-    .setDesc(description)
-    .addText((text) => {
-      text.setPlaceholder(placeholder);
-      text.setValue(value ?? "");
-      text.onChange(async (nextValue) => {
-        await onChange(nextValue);
-      });
-    });
 }

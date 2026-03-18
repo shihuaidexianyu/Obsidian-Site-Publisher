@@ -43,6 +43,28 @@ export function updateOptionalCliSetting<TKey extends "executablePath" | "logDir
   return nextSettings;
 }
 
+export function formatGlobList(patterns: string[]): string {
+  return patterns.join("\n");
+}
+
+export function parseGlobList(value: string): string[] {
+  return value
+    .split(/\r?\n/u)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
+export function updateGlobListSetting<TKey extends "includeGlobs" | "excludeGlobs">(
+  currentConfig: PublisherConfig,
+  key: TKey,
+  value: string
+): PublisherConfig {
+  return {
+    ...currentConfig,
+    [key]: parseGlobList(value)
+  };
+}
+
 export function updatePreviewPortSetting(
   currentSettings: PublisherPluginSettings["cli"],
   value: string

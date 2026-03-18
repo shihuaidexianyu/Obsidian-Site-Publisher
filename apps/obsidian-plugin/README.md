@@ -27,7 +27,7 @@
 - loads and saves plugin settings through Obsidian `loadData()` / `saveData()`
 - registers four commands: preview, build, publish, issues
 - creates a status bar item and updates it with the latest command result
-- exposes a settings tab for publish mode, publish root, output dir, deploy target selection, external CLI path, CLI log directory, preview port, deploy repository settings, and Quartz feature toggles
+- exposes a settings tab for publish mode, publish root, include/exclude path rules, output dir, deploy target selection, external CLI path, CLI log directory, preview port, deploy repository settings, and Quartz feature toggles
 - opens a dedicated issues view for scan/build results
 - opens a dedicated build logs view for build/publish results
 - executes commands through an external CLI subprocess so Quartz/build work stays outside the Obsidian renderer
