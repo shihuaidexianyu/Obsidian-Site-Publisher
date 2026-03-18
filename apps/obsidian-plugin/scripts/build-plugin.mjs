@@ -12,6 +12,8 @@ const packageJsonPath = path.join(workspaceRoot, "package.json");
 const manifestPath = path.join(pluginRoot, "manifest.json");
 const releaseRoot = path.join(workspaceRoot, ".obsidian-plugin-build");
 const { build } = await import(pathToFileURL(workspaceRequire.resolve("esbuild")).href);
+const workspaceQuartzPackageRoot = path.dirname(workspaceRequire.resolve("@jackyzha0/quartz/package.json"));
+const workspaceVirtualStoreRoot = path.join(workspaceRoot, "node_modules", ".pnpm");
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
@@ -60,21 +62,58 @@ console.log(`Obsidian plugin bundle written to ${pluginReleaseDir}`);
 
 async function bundleQuartzRuntime() {
   await runWorkspaceCommand("corepack", ["pnpm", "--filter", "@osp/builder-adapter-quartz", "deploy", "--prod", "--legacy", temporaryRuntimeDir]);
-  await cp(temporaryRuntimeDir, path.join(pluginReleaseDir, "runtime"), {
+  const bundledRuntimeDir = path.join(pluginReleaseDir, "runtime");
+  const bundledVirtualStoreNodeModulesDir = path.join(bundledRuntimeDir, "node_modules", ".pnpm", "node_modules");
+
+  await mkdir(bundledRuntimeDir, { recursive: true });
+  await cp(path.join(temporaryRuntimeDir, "package.json"), path.join(bundledRuntimeDir, "package.json"), {
+    force: true
+  });
+  await cp(path.join(temporaryRuntimeDir, "node_modules"), path.join(bundledRuntimeDir, "node_modules"), {
     dereference: true,
     force: true,
     recursive: true
   });
+  await mkdir(bundledVirtualStoreNodeModulesDir, { recursive: true });
+  await cp(path.join(workspaceRoot, "node_modules", ".pnpm", "node_modules"), bundledVirtualStoreNodeModulesDir, {
+    dereference: true,
+    force: true,
+    recursive: true
+  });
+  await cp(
+    workspaceQuartzPackageRoot,
+    path.join(bundledRuntimeDir, "node_modules", ".pnpm", path.relative(workspaceVirtualStoreRoot, workspaceQuartzPackageRoot)),
+    {
+      dereference: true,
+      force: true,
+      recursive: true
+    }
+  );
   await rm(temporaryRuntimeDir, { recursive: true, force: true });
-  await pruneBundledQuartzRuntime(path.join(pluginReleaseDir, "runtime"));
+  await pruneBundledQuartzRuntime(bundledRuntimeDir);
+  await assertBundledQuartzRuntime(bundledRuntimeDir);
 }
 
 async function pruneBundledQuartzRuntime(runtimeRoot) {
   await Promise.all(
-    ["dist", "src", "index.ts", "README.md", "tsconfig.json"].map(async (entry) => {
+    [
+      "dist",
+      "src",
+      "index.ts",
+      "README.md",
+      "tsconfig.json",
+      ".tmp-quartz-deploy-test",
+      path.join("node_modules", "@osp")
+    ].map(async (entry) => {
       await rm(path.join(runtimeRoot, entry), { recursive: true, force: true });
     })
   );
+}
+
+async function assertBundledQuartzRuntime(runtimeRoot) {
+  const runtimeRequire = createRequire(path.join(runtimeRoot, "package.json"));
+
+  runtimeRequire.resolve("@jackyzha0/quartz/package.json");
 }
 
 async function runWorkspaceCommand(command, args) {

@@ -55,4 +55,43 @@ describe("bundled runtime helpers", () => {
       path.join(pluginRoot, "runtime", "node_modules", "@jackyzha0", "quartz")
     );
   });
+
+  it("prefers the pnpm Quartz package path when the bundled runtime contains a virtual store", async () => {
+    const pluginRoot = await mkdtemp(path.join(os.tmpdir(), "osp-plugin-runtime-"));
+
+    temporaryDirectories.push(pluginRoot);
+    await mkdir(
+      path.join(
+        pluginRoot,
+        "runtime",
+        "node_modules",
+        ".pnpm",
+        "@jackyzha0+quartz@test",
+        "node_modules",
+        "@jackyzha0",
+        "quartz"
+      ),
+      { recursive: true }
+    );
+    await writeFile(path.join(pluginRoot, "runtime", "package.json"), JSON.stringify({ name: "runtime" }), "utf8");
+    await writeFile(
+      path.join(
+        pluginRoot,
+        "runtime",
+        "node_modules",
+        ".pnpm",
+        "@jackyzha0+quartz@test",
+        "node_modules",
+        "@jackyzha0",
+        "quartz",
+        "package.json"
+      ),
+      JSON.stringify({ name: "@jackyzha0/quartz", version: "0.0.0-test" }),
+      "utf8"
+    );
+
+    expect(resolveBundledQuartzPackageRoot(pluginRoot)).toBe(
+      path.join(pluginRoot, "runtime", "node_modules", ".pnpm", "@jackyzha0+quartz@test", "node_modules", "@jackyzha0", "quartz")
+    );
+  });
 });
