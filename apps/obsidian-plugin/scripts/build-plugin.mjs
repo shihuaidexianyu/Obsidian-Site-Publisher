@@ -1,6 +1,7 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -12,17 +13,17 @@ const packageJsonPath = path.join(workspaceRoot, "package.json");
 const manifestPath = path.join(pluginRoot, "manifest.json");
 const releaseRoot = path.join(workspaceRoot, ".obsidian-plugin-build");
 const { build } = await import(pathToFileURL(workspaceRequire.resolve("esbuild")).href);
-const workspaceQuartzPackageRoot = path.dirname(workspaceRequire.resolve("@jackyzha0/quartz/package.json"));
-const workspaceVirtualStoreRoot = path.join(workspaceRoot, "node_modules", ".pnpm");
+const workspaceQuartzPackageRoot = path.dirname(
+  createRequire(path.join(workspaceRoot, "packages", "builder-adapter-quartz", "package.json")).resolve("@jackyzha0/quartz/package.json")
+);
+const workspaceQuartzPackageJson = JSON.parse(await readFile(path.join(workspaceQuartzPackageRoot, "package.json"), "utf8"));
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
 const pluginId = manifest.id;
 const pluginReleaseDir = path.join(releaseRoot, pluginId);
-const temporaryRuntimeDir = path.join(releaseRoot, `${pluginId}-runtime-tmp`);
 
 await rm(pluginReleaseDir, { recursive: true, force: true });
-await rm(temporaryRuntimeDir, { recursive: true, force: true });
 await mkdir(pluginReleaseDir, { recursive: true });
 
 await build({
@@ -61,50 +62,62 @@ await writeFile(
 console.log(`Obsidian plugin bundle written to ${pluginReleaseDir}`);
 
 async function bundleQuartzRuntime() {
-  await runWorkspaceCommand("corepack", ["pnpm", "--filter", "@osp/builder-adapter-quartz", "deploy", "--prod", "--legacy", temporaryRuntimeDir]);
+  const temporaryRuntimeDir = await mkdtemp(path.join(os.tmpdir(), `${pluginId}-runtime-`));
   const bundledRuntimeDir = path.join(pluginReleaseDir, "runtime");
-  const bundledVirtualStoreNodeModulesDir = path.join(bundledRuntimeDir, "node_modules", ".pnpm", "node_modules");
 
-  await mkdir(bundledRuntimeDir, { recursive: true });
-  await cp(path.join(temporaryRuntimeDir, "package.json"), path.join(bundledRuntimeDir, "package.json"), {
-    force: true
-  });
-  await cp(path.join(temporaryRuntimeDir, "node_modules"), path.join(bundledRuntimeDir, "node_modules"), {
-    dereference: true,
-    force: true,
-    recursive: true
-  });
-  await mkdir(bundledVirtualStoreNodeModulesDir, { recursive: true });
-  await cp(path.join(workspaceRoot, "node_modules", ".pnpm", "node_modules"), bundledVirtualStoreNodeModulesDir, {
-    dereference: true,
-    force: true,
-    recursive: true
-  });
-  await cp(
-    workspaceQuartzPackageRoot,
-    path.join(bundledRuntimeDir, "node_modules", ".pnpm", path.relative(workspaceVirtualStoreRoot, workspaceQuartzPackageRoot)),
-    {
+  try {
+    const quartzTarballName = await packQuartzRuntime(temporaryRuntimeDir);
+
+    await writeRuntimePackageJson(temporaryRuntimeDir, quartzTarballName);
+    await runCommand(resolveNpmExecutable(), ["install"], {
+      cwd: temporaryRuntimeDir
+    });
+    await pruneBundledQuartzRuntime(temporaryRuntimeDir, quartzTarballName);
+    await mkdir(bundledRuntimeDir, { recursive: true });
+    await cp(temporaryRuntimeDir, bundledRuntimeDir, {
       dereference: true,
       force: true,
       recursive: true
-    }
-  );
-  await rm(temporaryRuntimeDir, { recursive: true, force: true });
-  await pruneBundledQuartzRuntime(bundledRuntimeDir);
+    });
+  } finally {
+    await rm(temporaryRuntimeDir, { recursive: true, force: true });
+  }
+
   await assertBundledQuartzRuntime(bundledRuntimeDir);
 }
 
-async function pruneBundledQuartzRuntime(runtimeRoot) {
+async function packQuartzRuntime(temporaryRuntimeDir) {
+  const output = await runCommand(resolveNpmExecutable(), ["pack", "--pack-destination", temporaryRuntimeDir], {
+    captureOutput: true,
+    cwd: workspaceQuartzPackageRoot
+  });
+
+  return output.trim().split(/\r?\n/u).at(-1) ?? "jackyzha0-quartz.tgz";
+}
+
+async function writeRuntimePackageJson(temporaryRuntimeDir, quartzTarballName) {
+  await writeFile(
+    path.join(temporaryRuntimeDir, "package.json"),
+    JSON.stringify(
+      {
+        name: "osp-quartz-runtime",
+        private: true,
+        type: "module",
+        dependencies: {
+          "@jackyzha0/quartz": `file:./${quartzTarballName}`,
+          esbuild: workspaceQuartzPackageJson.devDependencies?.esbuild ?? "^0.27.2"
+        }
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+}
+
+async function pruneBundledQuartzRuntime(runtimeRoot, quartzTarballName) {
   await Promise.all(
-    [
-      "dist",
-      "src",
-      "index.ts",
-      "README.md",
-      "tsconfig.json",
-      ".tmp-quartz-deploy-test",
-      path.join("node_modules", "@osp")
-    ].map(async (entry) => {
+    [quartzTarballName, "package-lock.json"].map(async (entry) => {
       await rm(path.join(runtimeRoot, entry), { recursive: true, force: true });
     })
   );
@@ -114,18 +127,33 @@ async function assertBundledQuartzRuntime(runtimeRoot) {
   const runtimeRequire = createRequire(path.join(runtimeRoot, "package.json"));
 
   runtimeRequire.resolve("@jackyzha0/quartz/package.json");
+  runtimeRequire.resolve("esbuild/package.json");
 }
 
-async function runWorkspaceCommand(command, args) {
-  const commandLine = `${quoteShellArgument(command)} ${args.map(quoteShellArgument).join(" ")}`;
+async function runCommand(command, args, options) {
+  const stdoutChunks = [];
+  const stderrChunks = [];
 
   await new Promise((resolve, reject) => {
-    const child = spawn(commandLine, [], {
-      cwd: workspaceRoot,
-      shell: true,
-      stdio: "inherit",
-      windowsHide: true
-    });
+    const child = spawn(
+      process.platform === "win32" ? process.env.ComSpec ?? "cmd.exe" : command,
+      process.platform === "win32"
+        ? ["/d", "/s", "/c", buildCommandLine(command, args)]
+        : args,
+      {
+        cwd: options.cwd,
+        shell: false,
+        stdio: options.captureOutput ? "pipe" : "inherit",
+        windowsHide: true
+      }
+    );
+
+    if (options.captureOutput) {
+      child.stdout?.setEncoding("utf8");
+      child.stderr?.setEncoding("utf8");
+      child.stdout?.on("data", (chunk) => stdoutChunks.push(chunk));
+      child.stderr?.on("data", (chunk) => stderrChunks.push(chunk));
+    }
 
     child.once("error", reject);
     child.once("exit", (code) => {
@@ -134,11 +162,30 @@ async function runWorkspaceCommand(command, args) {
         return;
       }
 
-      reject(new Error(`${command} ${args.join(" ")} exited with code ${code ?? 1}.`));
+      reject(
+        new Error(
+          [
+            `${command} ${args.join(" ")} exited with code ${code ?? 1}.`,
+            stderrChunks.join("").trim()
+          ]
+            .filter((message) => message !== "")
+            .join(" ")
+        )
+      );
     });
   });
+
+  return stdoutChunks.join("");
+}
+
+function resolveNpmExecutable() {
+  return process.platform === "win32" ? "npm.cmd" : "npm";
+}
+
+function buildCommandLine(command, args) {
+  return [command, ...args].map(quoteShellArgument).join(" ");
 }
 
 function quoteShellArgument(argument) {
-  return /[\s"]/u.test(argument) ? JSON.stringify(argument) : argument;
+  return /[\s"]/u.test(argument) ? `"${argument.replace(/"/g, '\\"')}"` : argument;
 }

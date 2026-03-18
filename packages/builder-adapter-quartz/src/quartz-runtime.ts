@@ -24,6 +24,7 @@ export async function ensureQuartzWorkspaceRuntime(
   }
 
   await ensureNodeModulesLink(workspace.rootDir, await resolveQuartzNodeModulesPath(quartzPackageRoot));
+  await ensureQuartzPackageNodeModulesLink(workspace.rootDir, quartzPackageRoot);
   await writeFile(path.join(workspace.rootDir, "quartz.config.ts"), renderQuartzConfig(config), "utf8");
   await writeFile(path.join(workspace.rootDir, "quartz.layout.ts"), renderQuartzLayout(config), "utf8");
 }
@@ -51,6 +52,31 @@ async function ensureNodeModulesLink(workspaceRoot: string, sourceNodeModulesPat
   }
 
   await symlink(sourceNodeModulesPath, linkPath, "junction");
+}
+
+async function ensureQuartzPackageNodeModulesLink(workspaceRoot: string, quartzPackageRoot: string): Promise<void> {
+  const quartzPackageNodeModulesPath = path.join(quartzPackageRoot, "node_modules");
+  const workspaceQuartzNodeModulesPath = path.join(workspaceRoot, "quartz", "node_modules");
+
+  try {
+    await access(quartzPackageNodeModulesPath);
+  } catch {
+    return;
+  }
+
+  try {
+    const stats = await lstat(workspaceQuartzNodeModulesPath);
+
+    if (stats.isSymbolicLink()) {
+      return;
+    }
+
+    await rm(workspaceQuartzNodeModulesPath, { force: true, recursive: true });
+  } catch {
+    // No existing Quartz-local node_modules entry in the staging workspace.
+  }
+
+  await symlink(quartzPackageNodeModulesPath, workspaceQuartzNodeModulesPath, "junction");
 }
 
 export async function resolveQuartzNodeModulesPath(quartzPackageRoot: string): Promise<string> {

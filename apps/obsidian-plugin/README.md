@@ -37,8 +37,9 @@
 
 - run `corepack pnpm build:obsidian-plugin` from the workspace root
 - the installable plugin bundle is written to `.obsidian-plugin-build/obsidian-site-publisher`
-- copy `main.js`, `manifest.json`, and `versions.json` from that folder into:
+- copy `main.js`, `manifest.json`, `versions.json`, and the `runtime/` directory from that folder into:
   `YourVault/.obsidian/plugins/obsidian-site-publisher/`
+- the bundled `runtime/` directory contains a self-contained Quartz runtime used by `build`, `preview`, and `publish`
 
 ## Depends On
 
