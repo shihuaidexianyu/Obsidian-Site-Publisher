@@ -31,22 +31,13 @@ export class GitBranchDeployAdapter implements DeployAdapter {
     const deployBranch = config.deployBranch ?? defaultDeployBranch;
 
     try {
-      const repoRoot = await resolveRepositoryRoot(config.vaultRoot);
-      const currentBranch = await resolveCurrentBranch(repoRoot);
-
-      if (currentBranch === deployBranch) {
-        return {
-          success: false,
-          target: config.deployTarget,
-          message: `Refusing to deploy to the currently checked out branch ${deployBranch}. Choose a dedicated deploy branch.`
-        };
-      }
-
-      const branchExists = await doesBranchExist(repoRoot, deployBranch);
+      const remoteUrl = await resolveDeployRemoteUrl(config);
       const temporaryRepository = await mkdtemp(path.join(os.tmpdir(), "osp-git-deploy-"));
 
       try {
-        await initializeTemporaryRepository(temporaryRepository, repoRoot);
+        await initializeTemporaryRepository(temporaryRepository, remoteUrl);
+        await configureCommitIdentity(temporaryRepository, config.vaultRoot);
+        const branchExists = await doesRemoteBranchExist(temporaryRepository, deployBranch);
         await checkoutDeployBranch(temporaryRepository, deployBranch, branchExists);
         await emptyDirectoryExceptGit(temporaryRepository);
         await copyDirectoryContents(build.outputDir, temporaryRepository);
@@ -89,24 +80,61 @@ async function resolveRepositoryRoot(vaultRoot: string): Promise<string> {
   return result.stdout;
 }
 
+async function resolveDeployRemoteUrl(config: PublisherConfig): Promise<string> {
+  if (config.deployRepositoryUrl !== undefined) {
+    return config.deployRepositoryUrl;
+  }
+
+  const repoRoot = await resolveRepositoryRoot(config.vaultRoot);
+  const currentBranch = await resolveCurrentBranch(repoRoot);
+  const deployBranch = config.deployBranch ?? defaultDeployBranch;
+
+  if (currentBranch === deployBranch) {
+    throw new Error(`Refusing to deploy to the currently checked out branch ${deployBranch}. Choose a dedicated deploy branch.`);
+  }
+
+  return repoRoot;
+}
+
 async function resolveCurrentBranch(repoRoot: string): Promise<string | undefined> {
   const result = await runGit(["branch", "--show-current"], repoRoot);
 
   return result.stdout === "" ? undefined : result.stdout;
 }
 
-async function doesBranchExist(repoRoot: string, deployBranch: string): Promise<boolean> {
-  try {
-    await runGit(["show-ref", "--verify", "--quiet", `refs/heads/${deployBranch}`], repoRoot);
-    return true;
-  } catch {
-    return false;
+async function initializeTemporaryRepository(temporaryRepository: string, remoteUrl: string): Promise<void> {
+  await runGit(["init"], temporaryRepository);
+  await runGit(["remote", "add", "origin", remoteUrl], temporaryRepository);
+}
+
+async function configureCommitIdentity(temporaryRepository: string, vaultRoot: string): Promise<void> {
+  const repositoryRoot = await resolveRepositoryRoot(vaultRoot).catch(() => undefined);
+  const userName = repositoryRoot === undefined ? undefined : await readGitConfig(repositoryRoot, "user.name");
+  const userEmail = repositoryRoot === undefined ? undefined : await readGitConfig(repositoryRoot, "user.email");
+
+  if (userName !== undefined) {
+    await runGit(["config", "user.name", userName], temporaryRepository);
+  }
+
+  if (userEmail !== undefined) {
+    await runGit(["config", "user.email", userEmail], temporaryRepository);
   }
 }
 
-async function initializeTemporaryRepository(temporaryRepository: string, repoRoot: string): Promise<void> {
-  await runGit(["init"], temporaryRepository);
-  await runGit(["remote", "add", "origin", repoRoot], temporaryRepository);
+async function readGitConfig(repositoryRoot: string, key: string): Promise<string | undefined> {
+  try {
+    const result = await runGit(["config", "--get", key], repositoryRoot);
+
+    return result.stdout === "" ? undefined : result.stdout;
+  } catch {
+    return undefined;
+  }
+}
+
+async function doesRemoteBranchExist(temporaryRepository: string, deployBranch: string): Promise<boolean> {
+  const result = await runGit(["ls-remote", "--heads", "origin", deployBranch], temporaryRepository);
+
+  return result.stdout !== "";
 }
 
 async function checkoutDeployBranch(
@@ -115,7 +143,7 @@ async function checkoutDeployBranch(
   branchExists: boolean
 ): Promise<void> {
   if (branchExists) {
-    await runGit(["fetch", "origin", `refs/heads/${deployBranch}:refs/remotes/origin/${deployBranch}`], temporaryRepository);
+    await runGit(["fetch", "origin", deployBranch], temporaryRepository);
     await runGit(["checkout", "-B", deployBranch, `refs/remotes/origin/${deployBranch}`], temporaryRepository);
     return;
   }
@@ -160,6 +188,10 @@ async function hasGitChanges(temporaryRepository: string): Promise<boolean> {
 
 function formatGitDeployError(error: unknown): string {
   if (error instanceof Error) {
+    if (error.message.startsWith("Refusing to deploy")) {
+      return error.message;
+    }
+
     return `Git branch deploy failed: ${error.message}`;
   }
 

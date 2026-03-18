@@ -3,12 +3,14 @@ import type { BuildResult, DeployResult, PublisherConfig } from "@osp/shared";
 import type { DeployAdapter } from "./contracts.js";
 import { FileSystemDeployAdapter } from "./file-system-deploy-adapter.js";
 import { GitBranchDeployAdapter } from "./git-branch-deploy-adapter.js";
+import { GitHubPagesDeployAdapter } from "./github-pages-deploy-adapter.js";
 import { NoopDeployAdapter } from "./noop-deploy-adapter.js";
 
 export class DefaultDeployAdapter implements DeployAdapter {
   private readonly noopAdapter = new NoopDeployAdapter();
   private readonly fileSystemAdapter = new FileSystemDeployAdapter();
   private readonly gitBranchAdapter = new GitBranchDeployAdapter();
+  private readonly gitHubPagesAdapter = new GitHubPagesDeployAdapter();
 
   public async deploy(build: BuildResult, config: PublisherConfig): Promise<DeployResult> {
     if (config.deployTarget === "none") {
@@ -21,6 +23,10 @@ export class DefaultDeployAdapter implements DeployAdapter {
 
     if (config.deployTarget === "git-branch") {
       return this.gitBranchAdapter.deploy(build, config);
+    }
+
+    if (config.deployTarget === "github-pages") {
+      return this.gitHubPagesAdapter.deploy(build, config);
     }
 
     return {

@@ -7,6 +7,7 @@
 - future Git and GitHub Pages publishing implementations
 - local filesystem export for real deploy smoke tests
 - git branch deployment for branch-based publishing workflows
+- GitHub Pages deployment for repository-backed pages publishing
 
 ## Not Responsible For
 
@@ -20,6 +21,7 @@
 - `DefaultDeployAdapter`
 - `FileSystemDeployAdapter`
 - `GitBranchDeployAdapter`
+- `GitHubPagesDeployAdapter`
 - `NoopDeployAdapter`
 
 ## Depends On

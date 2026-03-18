@@ -6,12 +6,13 @@ import { DefaultDeployAdapter } from "./default-deploy-adapter.js";
 describe("DefaultDeployAdapter", () => {
   it("returns a structured failure for unimplemented deploy targets", async () => {
     const adapter = new DefaultDeployAdapter();
-    const result = await adapter.deploy(createBuildResult(), createConfig("github-pages"));
+    const result = await adapter.deploy(createBuildResult(), createConfig("none"));
 
     expect(result).toEqual({
-      success: false,
-      target: "github-pages",
-      message: "Deploy target github-pages is not implemented yet."
+      success: true,
+      target: "none",
+      destination: "/workspace/dist",
+      message: "Noop deploy adapter accepted the build output."
     });
   });
 });

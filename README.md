@@ -26,6 +26,7 @@ Real pipeline status today:
 - plugin and CLI both call the same `@osp/core` orchestration path
 - deploy now has a real `local-export` target that copies a successful build into a dedicated output directory
 - deploy also supports `git-branch`, which commits the built site into a dedicated branch such as `gh-pages`
+- deploy also supports `github-pages`, including external repository URLs such as `username.github.io`
 
 Useful deploy config examples:
 
@@ -40,6 +41,15 @@ Useful deploy config examples:
 {
   "deployTarget": "git-branch",
   "deployBranch": "gh-pages",
+  "deployCommitMessage": "Deploy static site"
+}
+```
+
+```json
+{
+  "deployTarget": "github-pages",
+  "deployRepositoryUrl": "https://github.com/<user>/<user>.github.io",
+  "deployBranch": "main",
   "deployCommitMessage": "Deploy static site"
 }
 ```

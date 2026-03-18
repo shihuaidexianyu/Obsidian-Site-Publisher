@@ -107,6 +107,7 @@ export type PublisherConfig = {
   deployOutputDir?: string;
   deployBranch?: string;
   deployCommitMessage?: string;
+  deployRepositoryUrl?: string;
   enableSearch: boolean;
   enableBacklinks: boolean;
   enableGraph: boolean;
