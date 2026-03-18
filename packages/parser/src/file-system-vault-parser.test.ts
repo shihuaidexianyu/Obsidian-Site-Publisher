@@ -37,6 +37,7 @@ describe("FileSystemVaultParser", () => {
     expect(propertiesResult.manifest.notes.map((note) => note.path)).toEqual(["Publishable.md"]);
     expect(propertiesResult.manifest.notes[0]).toMatchObject({
       path: "Publishable.md",
+      slug: "Publishable",
       publish: true,
       permalink: "/publishable/",
       description: "Properties fixture",
@@ -99,6 +100,7 @@ describe("FileSystemVaultParser", () => {
       ]
     });
     expect(headingResult.manifest.notes.find((note) => note.path === "Source.md")).toMatchObject({
+      slug: "Source",
       headings: [
         {
           text: "Source Heading",
@@ -121,6 +123,7 @@ describe("FileSystemVaultParser", () => {
       ]
     });
     expect(embedsResult.manifest.notes.find((note) => note.path === "Host.md")).toMatchObject({
+      slug: "Host",
       embeds: [
         {
           kind: "note",
@@ -194,9 +197,27 @@ describe("FileSystemVaultParser", () => {
 
     expect(result.manifest.notes[0]).toMatchObject({
       path: "BodyDivider.md",
+      slug: "BodyDivider",
       publish: false,
       aliases: [],
       properties: {}
+    });
+  });
+
+  it("derives path-aware slugs for nested notes", async () => {
+    const vaultRoot = await createTempVault();
+
+    await mkdir(path.join(vaultRoot, "Topic"), { recursive: true });
+    await writeFile(path.join(vaultRoot, "Topic", "Guide.md"), "# Guide", "utf8");
+
+    const result = await new FileSystemVaultParser().scanVault({
+      vaultRoot,
+      config: createConfig(vaultRoot)
+    });
+
+    expect(result.manifest.notes[0]).toMatchObject({
+      path: "Topic/Guide.md",
+      slug: "Topic/Guide"
     });
   });
 });

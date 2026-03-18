@@ -6,8 +6,6 @@ import type { AssetRef, PublisherConfig, UnsupportedObjectRecord, VaultManifest,
 import type { ScanInput, ScanResult, VaultParser } from "./contracts.js";
 import { parseFrontmatterFields } from "./frontmatter.js";
 import { analyzeMarkdownContent } from "./markdown-analysis.js";
-import { slugify } from "./slug.js";
-
 export class FileSystemVaultParser implements VaultParser {
   public async scanVault(input: ScanInput): Promise<ScanResult> {
     const scanState = createScanState(input.config);
@@ -102,7 +100,7 @@ async function createNoteRecord(
     id: relativePath,
     path: relativePath,
     title: fileName,
-    slug: slugify(fileName),
+    slug: frontmatterFields.slug ?? createNoteSlug(relativePath),
     aliases: frontmatterFields.aliases,
     headings: markdownAnalysis.headings,
     blockIds: markdownAnalysis.blockIds,
@@ -126,6 +124,10 @@ async function createNoteRecord(
   }
 
   return noteRecord;
+}
+
+function createNoteSlug(relativePath: string): string {
+  return relativePath.replace(/\.md$/u, "");
 }
 
 function createUnsupportedObjectRecord(relativePath: string): UnsupportedObjectRecord {

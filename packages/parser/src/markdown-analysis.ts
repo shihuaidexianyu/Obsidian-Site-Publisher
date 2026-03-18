@@ -7,7 +7,7 @@ type MarkdownAnalysis = Pick<NoteRecord, "assets" | "blockIds" | "embeds" | "hea
 
 const wikilinkPattern = /(!)?\[\[([^[\]]+?)\]\]/g;
 const markdownLinkPattern = /(!)?\[[^\]]*?\]\(([^)]+)\)/g;
-const codeFencePattern = /^\s*(```|~~~)/;
+const codeFencePattern = /^\s*(?:>+\s*)?(?:(?:[-+*]|\d+\.)\s+)?(`{3,}|~{3,})/;
 const headingPattern = /^(#{1,6})[ \t]+(.+?)\s*$/;
 const trailingHeadingMarkerPattern = /\s+#+\s*$/;
 const blockIdPattern = /\^([A-Za-z0-9-]+)\s*$/;
@@ -25,18 +25,18 @@ export function analyzeMarkdownContent(markdownSource: string): MarkdownAnalysis
 
   for (const [index, line] of content.split(/\r?\n/).entries()) {
     const lineNumber = index + 1;
-    const fenceMatch = line.match(codeFencePattern);
+    const fenceMarker = readFenceMarker(line);
 
-    if (fenceMatch !== null) {
-      const fenceMarker = fenceMatch[1];
-
+    if (fenceMarker !== undefined) {
       if (activeFenceMarker === undefined) {
         activeFenceMarker = fenceMarker;
-      } else if (activeFenceMarker === fenceMarker) {
-        activeFenceMarker = undefined;
+        continue;
       }
 
-      continue;
+      if (isFenceClosedBy(activeFenceMarker, fenceMarker)) {
+        activeFenceMarker = undefined;
+        continue;
+      }
     }
 
     if (activeFenceMarker !== undefined) {
@@ -66,6 +66,14 @@ export function analyzeMarkdownContent(markdownSource: string): MarkdownAnalysis
     embeds,
     assets
   };
+}
+
+function readFenceMarker(line: string): string | undefined {
+  return line.match(codeFencePattern)?.[1];
+}
+
+function isFenceClosedBy(activeFenceMarker: string, candidateFenceMarker: string): boolean {
+  return candidateFenceMarker[0] === activeFenceMarker[0] && candidateFenceMarker.length >= activeFenceMarker.length;
 }
 
 function extractHeading(line: string): HeadingRecord | undefined {

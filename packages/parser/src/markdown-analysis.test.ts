@@ -66,4 +66,16 @@ Paragraph with block.^block-id
       }
     ]);
   });
+
+  it("ignores wikilinks inside fenced code blocks nested under list items", () => {
+    const result = analyzeMarkdownContent(`- Example:
+  \`\`\`c
+  [[include]] <stdio.h>
+  \`\`\`
+`);
+
+    expect(result.links).toEqual([]);
+    expect(result.embeds).toEqual([]);
+    expect(result.assets).toEqual([]);
+  });
 });

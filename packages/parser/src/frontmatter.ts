@@ -5,6 +5,7 @@ export type FrontmatterFields = {
   publish: boolean;
   aliases: string[];
   frontmatterError?: string;
+  slug?: string;
   permalink?: string;
   description?: string;
 };
@@ -33,6 +34,10 @@ export function parseFrontmatterFields(markdownSource: string): FrontmatterField
 
   if (typeof parsedFrontmatter.properties.permalink === "string") {
     fields.permalink = parsedFrontmatter.properties.permalink;
+  }
+
+  if (typeof parsedFrontmatter.properties.slug === "string") {
+    fields.slug = parsedFrontmatter.properties.slug;
   }
 
   if (typeof parsedFrontmatter.properties.description === "string") {
