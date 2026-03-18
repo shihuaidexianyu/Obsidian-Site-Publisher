@@ -6,6 +6,9 @@ export type PluginHost = {
   registerCommand(definition: PluginCommandDefinition, callback: () => Promise<void>): void;
   setStatus(message: string): void;
   showNotice(message: string): void;
+  revealIssueListView(): Promise<void>;
+  revealBuildLogView(): Promise<void>;
+  refreshViews(): void;
 };
 
 type PluginCommandRunner = {
@@ -34,12 +37,27 @@ export class PluginCommandController {
 
       this.host.setStatus(result.statusMessage);
       this.host.showNotice(result.statusMessage);
+      await this.syncViews(result);
     } catch (error) {
       const message = formatPluginCommandError(command, error);
 
       this.host.setStatus(message);
       this.host.showNotice(message);
+      this.host.refreshViews();
     }
+  }
+
+  private async syncViews(result: PluginCommandResult): Promise<void> {
+    if (result.command === "issues") {
+      await this.host.revealIssueListView();
+    }
+
+    if (result.command === "build" || result.command === "publish") {
+      await this.host.revealIssueListView();
+      await this.host.revealBuildLogView();
+    }
+
+    this.host.refreshViews();
   }
 }
 

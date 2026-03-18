@@ -27,6 +27,7 @@ describe("PluginCommandController", () => {
     expect(shell.runCommand).toHaveBeenCalledWith("preview", createConfig("/vault"));
     expect(host.setStatus).toHaveBeenCalledWith("Preview ready at http://localhost:8080");
     expect(host.showNotice).toHaveBeenCalledWith("Preview ready at http://localhost:8080");
+    expect(host.refreshViews).toHaveBeenCalledOnce();
   });
 
   it("surfaces command failures as readable host messages", async () => {
@@ -47,6 +48,21 @@ describe("PluginCommandController", () => {
     expect(host.showNotice).toHaveBeenCalledWith(
       "preview failed: Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
     );
+    expect(host.refreshViews).toHaveBeenCalledOnce();
+  });
+
+  it("reveals issue and log views for build-oriented commands", async () => {
+    const host = createHost();
+    const shell = createShell({
+      statusMessage: "Build completed successfully."
+    });
+    const controller = new PluginCommandController(shell, host, () => createConfig("/vault"));
+
+    await controller.runCommand("build");
+
+    expect(host.revealIssueListView).toHaveBeenCalledOnce();
+    expect(host.revealBuildLogView).toHaveBeenCalledOnce();
+    expect(host.refreshViews).toHaveBeenCalledOnce();
   });
 });
 
@@ -68,7 +84,10 @@ function createHost() {
   return {
     registerCommand: vi.fn(),
     setStatus: vi.fn(),
-    showNotice: vi.fn()
+    showNotice: vi.fn(),
+    revealIssueListView: vi.fn(async () => {}),
+    revealBuildLogView: vi.fn(async () => {}),
+    refreshViews: vi.fn()
   };
 }
 

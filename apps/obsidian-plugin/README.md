@@ -28,6 +28,8 @@
 - registers four commands: preview, build, publish, issues
 - creates a status bar item and updates it with the latest command result
 - exposes a minimal settings tab for publish mode, publish root, output dir, and Quartz feature toggles
+- opens a dedicated issues view for scan/build results
+- opens a dedicated build logs view for build/publish results
 - executes commands through `@osp/core`
 - keeps the latest issues, logs, build result, preview session, and deploy result in plugin state
 
