@@ -1,7 +1,7 @@
 import type { BuildResult, DeployResult, PreviewSession, PublisherConfig, VaultManifest } from "@osp/shared";
 import { describe, expect, it, vi } from "vitest";
 
-import { PublisherPluginShell } from "./main";
+import { PublisherPluginShell } from "./plugin-shell.js";
 
 describe("PublisherPluginShell", () => {
   it("exposes the four plugin commands with stable ids", () => {

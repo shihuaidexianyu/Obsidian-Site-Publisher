@@ -16,13 +16,18 @@
 
 ## Public Surface
 
+- default `ObsidianSitePublisherPlugin`
 - `PublisherPluginShell`
+- `PluginCommandController`
 - `pluginManifest`
 
 ## Current Behavior
 
-- exposes four command definitions: preview, build, publish, issues
-- creates a default config from the active vault root
+- provides a real Obsidian `Plugin` entry backed by the official `obsidian` API
+- loads and saves plugin settings through Obsidian `loadData()` / `saveData()`
+- registers four commands: preview, build, publish, issues
+- creates a status bar item and updates it with the latest command result
+- exposes a minimal settings tab for publish mode, publish root, output dir, and Quartz feature toggles
 - executes commands through `@osp/core`
 - keeps the latest issues, logs, build result, preview session, and deploy result in plugin state
 
@@ -30,3 +35,4 @@
 
 - `@osp/core`
 - `@osp/shared`
+- `obsidian` types

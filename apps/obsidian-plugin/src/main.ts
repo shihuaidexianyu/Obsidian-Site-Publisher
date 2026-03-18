@@ -1,273 +1,175 @@
-import { createDefaultPublisherRuntime } from "@osp/core";
-import type { PublisherOrchestrator } from "@osp/core";
-import type { BuildIssue, BuildLogEntry, BuildResult, DeployResult, PreviewSession, PublisherConfig, VaultManifest } from "@osp/shared";
+import { FileSystemAdapter, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 
-export const pluginManifest = {
-  id: "obsidian-site-publisher",
-  name: "Obsidian Site Publisher"
-} as const;
+import { PluginCommandController } from "./plugin-controller.js";
+import { pluginManifest, PublisherPluginShell } from "./plugin-shell.js";
+import { loadPluginSettings, savePluginSettings } from "./settings.js";
 
-export type PluginCommand = "preview" | "build" | "publish" | "issues";
+export { pluginManifest } from "./plugin-shell.js";
+export * from "./plugin-controller.js";
+export * from "./plugin-shell.js";
+export * from "./settings.js";
 
-export type PluginCommandDefinition = {
-  id: string;
-  name: string;
-  command: PluginCommand;
-};
+export default class ObsidianSitePublisherPlugin extends Plugin {
+  private readonly shell = new PublisherPluginShell();
+  private settings = this.shell.createInitialConfig("");
+  private statusBarEl?: HTMLElement;
+  private controller?: PluginCommandController;
 
-export type PluginExecutionState = {
-  lastCommand?: PluginCommand | undefined;
-  lastUpdatedAt?: string | undefined;
-  statusMessage?: string | undefined;
-  lastManifest?: VaultManifest | undefined;
-  lastIssues: BuildIssue[];
-  lastLogs: BuildLogEntry[];
-  lastBuildResult?: BuildResult | undefined;
-  lastPreviewSession?: PreviewSession | undefined;
-  lastDeployResult?: DeployResult | undefined;
-};
+  public override async onload(): Promise<void> {
+    const vaultRoot = resolveVaultRoot(this);
+    const loadedSettings = await loadPluginSettings(this, this.shell, vaultRoot);
 
-export type PluginCommandResult =
-  | {
-      command: "issues";
-      manifest: VaultManifest;
-      issues: BuildIssue[];
-      statusMessage: string;
-    }
-  | {
-      command: "build";
-      result: BuildResult;
-      statusMessage: string;
-    }
-  | {
-      command: "preview";
-      session: PreviewSession;
-      statusMessage: string;
-    }
-  | {
-      command: "publish";
-      build: BuildResult;
-      deploy?: DeployResult;
-      statusMessage: string;
-    };
+    this.settings = loadedSettings.config;
+    this.statusBarEl = this.addStatusBarItem();
+    this.controller = new PluginCommandController(
+      this.shell,
+      {
+        registerCommand: (definition, callback) => {
+          this.addCommand({
+            id: definition.id,
+            name: definition.name,
+            callback: async () => callback()
+          });
+        },
+        setStatus: (message) => this.statusBarEl?.setText(message),
+        showNotice: (message) => {
+          new Notice(message);
+        }
+      },
+      () => this.settings
+    );
 
-type PluginOrchestrator = Pick<PublisherOrchestrator, "scan" | "build" | "preview" | "deployFromBuild">;
-
-type PluginRuntime = {
-  orchestrator: PluginOrchestrator;
-  stop(): Promise<void>;
-};
-
-const defaultState: PluginExecutionState = {
-  lastIssues: [],
-  lastLogs: []
-};
-
-export class PublisherPluginShell {
-  private state: PluginExecutionState = defaultState;
-
-  public constructor(private readonly createRuntime: () => PluginRuntime = createDefaultPublisherRuntime) {}
-
-  public getSupportedCommands(): PluginCommand[] {
-    return this.getCommandDefinitions().map((definition) => definition.command);
+    this.controller.registerCommands();
+    this.statusBarEl.setText("Obsidian Site Publisher ready.");
+    this.addSettingTab(new PublisherPluginSettingTab(this.app, this));
   }
 
-  public getCommandDefinitions(): PluginCommandDefinition[] {
-    return [
-      createCommandDefinition("preview", "Preview Site"),
-      createCommandDefinition("build", "Build Site"),
-      createCommandDefinition("publish", "Publish Site"),
-      createCommandDefinition("issues", "Show Publish Issues")
-    ];
+  public async updateConfig(nextConfig: typeof this.settings): Promise<void> {
+    this.settings = nextConfig;
+    await savePluginSettings(this, {
+      config: this.settings
+    });
+    this.statusBarEl?.setText("Publisher settings saved.");
   }
 
-  public createInitialConfig(vaultRoot: string): PublisherConfig {
-    return {
-      vaultRoot,
-      publishMode: "frontmatter",
-      includeGlobs: [],
-      excludeGlobs: ["**/.git/**", "**/.obsidian/**", "**/.osp/**", "**/.trash/**", "**/node_modules/**"],
-      outputDir: `${vaultRoot}/.osp/dist`,
-      builder: "quartz",
-      deployTarget: "none",
-      enableSearch: true,
-      enableBacklinks: true,
-      enableGraph: true,
-      strictMode: false
-    };
+  public getConfig(): typeof this.settings {
+    return this.settings;
+  }
+}
+
+class PublisherPluginSettingTab extends PluginSettingTab {
+  public constructor(app: Plugin["app"], private readonly plugin: ObsidianSitePublisherPlugin) {
+    super(app, plugin);
   }
 
-  public getState(): PluginExecutionState {
-    return {
-      ...this.state,
-      lastIssues: [...this.state.lastIssues],
-      lastLogs: [...this.state.lastLogs]
-    };
-  }
+  public display(): void {
+    const { containerEl } = this;
+    const config = this.plugin.getConfig();
 
-  public async runCommand(command: PluginCommand, config: PublisherConfig): Promise<PluginCommandResult> {
-    const runtime = this.createRuntime();
-
-    try {
-      switch (command) {
-        case "issues":
-          return await this.runIssuesCommand(runtime.orchestrator, config);
-        case "build":
-          return await this.runBuildCommand(runtime.orchestrator, config);
-        case "preview":
-          return await this.runPreviewCommand(runtime.orchestrator, config);
-        case "publish":
-          return await this.runPublishCommand(runtime.orchestrator, config);
-      }
-    } finally {
-      await runtime.stop();
-    }
-  }
-
-  private async runIssuesCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "issues" }>> {
-    const report = await orchestrator.scan(config);
-    const statusMessage = createIssuesStatusMessage(report.issues.length);
-
-    this.updateState({
-      lastCommand: "issues",
-      statusMessage,
-      lastManifest: report.manifest,
-      lastIssues: report.issues,
-      lastLogs: [],
-      lastBuildResult: undefined,
-      lastPreviewSession: undefined,
-      lastDeployResult: undefined
+    containerEl.empty();
+    containerEl.createEl("h2", {
+      text: "Obsidian Site Publisher"
     });
 
-    return {
-      command: "issues",
-      manifest: report.manifest,
-      issues: report.issues,
-      statusMessage
-    };
-  }
-
-  private async runBuildCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "build" }>> {
-    const result = await orchestrator.build(config);
-    const statusMessage = result.success ? "Build completed successfully." : "Build failed. Check issues and logs.";
-
-    this.updateState({
-      lastCommand: "build",
-      statusMessage,
-      lastIssues: result.issues,
-      lastLogs: result.logs,
-      lastBuildResult: result,
-      lastPreviewSession: undefined,
-      lastDeployResult: undefined
-    });
-
-    return {
-      command: "build",
-      result,
-      statusMessage
-    };
-  }
-
-  private async runPreviewCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "preview" }>> {
-    const session = await orchestrator.preview(config);
-    const statusMessage = `Preview ready at ${session.url}`;
-
-    this.updateState({
-      lastCommand: "preview",
-      statusMessage,
-      lastIssues: this.state.lastIssues,
-      lastLogs: [],
-      lastBuildResult: undefined,
-      lastPreviewSession: session,
-      lastDeployResult: undefined
-    });
-
-    return {
-      command: "preview",
-      session,
-      statusMessage
-    };
-  }
-
-  private async runPublishCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "publish" }>> {
-    const build = await orchestrator.build(config);
-
-    if (!build.success) {
-      const statusMessage = "Publish stopped because build did not succeed.";
-
-      this.updateState({
-        lastCommand: "publish",
-        statusMessage,
-        lastIssues: build.issues,
-        lastLogs: build.logs,
-        lastBuildResult: build,
-        lastPreviewSession: undefined,
-        lastDeployResult: undefined
+    new Setting(containerEl)
+      .setName("Publish mode")
+      .setDesc("Choose whether published notes are selected by frontmatter or by folder.")
+      .addDropdown((dropdown) => {
+        dropdown.addOption("frontmatter", "Frontmatter");
+        dropdown.addOption("folder", "Folder");
+        dropdown.setValue(config.publishMode);
+        dropdown.onChange(async (value) => {
+          await this.plugin.updateConfig({
+            ...config,
+            publishMode: value === "folder" ? "folder" : "frontmatter"
+          });
+          this.display();
+        });
       });
 
-      return {
-        command: "publish",
-        build,
-        statusMessage
-      };
-    }
+    new Setting(containerEl)
+      .setName("Publish root")
+      .setDesc("Optional folder root used when publish mode is folder.")
+      .addText((text) => {
+        text.setPlaceholder("Public");
+        text.setValue(config.publishRoot ?? "");
+        text.onChange(async (value) => {
+          const nextConfig = { ...config };
 
-    const deploy = await orchestrator.deployFromBuild(build, config);
-    const statusMessage = deploy.success ? "Publish completed successfully." : "Deploy failed after a successful build.";
+          if (value.trim() === "") {
+            delete nextConfig.publishRoot;
+          } else {
+            nextConfig.publishRoot = value.trim();
+          }
 
-    this.updateState({
-      lastCommand: "publish",
-      statusMessage,
-      lastIssues: build.issues,
-      lastLogs: build.logs,
-      lastBuildResult: build,
-      lastPreviewSession: undefined,
-      lastDeployResult: deploy
+          await this.plugin.updateConfig({
+            ...nextConfig
+          });
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Output directory")
+      .setDesc("Where generated site output should be written.")
+      .addText((text) => {
+        text.setValue(config.outputDir);
+        text.onChange(async (value) => {
+          await this.plugin.updateConfig({
+            ...config,
+            outputDir: value.trim()
+          });
+        });
+      });
+
+    addToggleSetting(containerEl, "Strict mode", "Block preview and build on warnings too.", config.strictMode, async (value) => {
+      await this.plugin.updateConfig({
+        ...config,
+        strictMode: value
+      });
     });
-
-    return {
-      command: "publish",
-      build,
-      deploy,
-      statusMessage
-    };
-  }
-
-  private updateState(nextState: Partial<PluginExecutionState>): void {
-    this.state = {
-      ...this.state,
-      ...nextState,
-      lastUpdatedAt: new Date().toISOString(),
-      lastIssues: nextState.lastIssues ?? this.state.lastIssues,
-      lastLogs: nextState.lastLogs ?? this.state.lastLogs
-    };
+    addToggleSetting(containerEl, "Enable search", "Expose Quartz search UI on the generated site.", config.enableSearch, async (value) => {
+      await this.plugin.updateConfig({
+        ...config,
+        enableSearch: value
+      });
+    });
+    addToggleSetting(containerEl, "Enable backlinks", "Expose backlinks on generated note pages.", config.enableBacklinks, async (value) => {
+      await this.plugin.updateConfig({
+        ...config,
+        enableBacklinks: value
+      });
+    });
+    addToggleSetting(containerEl, "Enable graph", "Expose the Quartz graph view.", config.enableGraph, async (value) => {
+      await this.plugin.updateConfig({
+        ...config,
+        enableGraph: value
+      });
+    });
   }
 }
 
-function createCommandDefinition(command: PluginCommand, name: string): PluginCommandDefinition {
-  return {
-    id: `osp:${command}`,
-    name,
-    command
-  };
+function addToggleSetting(
+  containerEl: HTMLElement,
+  name: string,
+  description: string,
+  value: boolean,
+  onChange: (value: boolean) => Promise<void>
+): void {
+  new Setting(containerEl)
+    .setName(name)
+    .setDesc(description)
+    .addToggle((toggle) => {
+      toggle.setValue(value);
+      toggle.onChange(async (nextValue) => {
+        await onChange(nextValue);
+      });
+    });
 }
 
-function createIssuesStatusMessage(issueCount: number): string {
-  if (issueCount === 0) {
-    return "No publish issues detected.";
+function resolveVaultRoot(plugin: Plugin): string {
+  if (plugin.app.vault.adapter instanceof FileSystemAdapter) {
+    return plugin.app.vault.adapter.getBasePath();
   }
 
-  return `Found ${issueCount} publish issue(s).`;
+  throw new Error("Obsidian Site Publisher requires FileSystemAdapter and desktop vault access.");
 }

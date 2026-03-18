@@ -8,5 +8,8 @@
   "dependencies": {
     "@osp/core": "workspace:*",
     "@osp/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "obsidian": "1.12.3"
   }
 }
