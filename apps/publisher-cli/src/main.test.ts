@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -170,6 +170,48 @@ describe("runCli", () => {
     });
   });
 
+  it("writes structured build.result.logs into the CLI log file in json mode", async () => {
+    const cwd = await createTempDirectory();
+    const vaultRoot = path.join(cwd, "vault");
+    const output = createCapturedOutput();
+    const runtime = createStubRuntime({
+      buildResult: {
+        success: true,
+        outputDir: path.join(vaultRoot, ".osp", "dist"),
+        manifestPath: path.join(vaultRoot, ".osp", "manifest.json"),
+        issues: [],
+        logs: [
+          {
+            level: "info",
+            message: "Quartz build finished.",
+            timestamp: "2026-03-18T11:11:13.000Z"
+          },
+          {
+            level: "warning",
+            message: "Latex emitted a warning.",
+            timestamp: "2026-03-18T11:11:13.100Z"
+          }
+        ],
+        durationMs: 12
+      }
+    });
+
+    const exitCode = await runCli(["build", "--vault-root", vaultRoot, "--json"], {
+      cwd,
+      output,
+      createRuntime: () => runtime
+    });
+
+    expect(exitCode).toBe(0);
+
+    const payload = JSON.parse(output.logs.at(-1) ?? "{}") as { logPath?: string };
+    const logContents = await readFile(payload.logPath ?? "", "utf8");
+
+    expect(logContents).toContain("[build] Quartz build finished.");
+    expect(logContents).toContain("[build] Latex emitted a warning.");
+    expect(logContents).toContain("WARNING");
+  });
+
   it("passes Quartz builder options into the runtime factory", async () => {
     const output = createCapturedOutput();
     const runtime = createStubRuntime();
@@ -241,7 +283,13 @@ function createBuildResult(): BuildResult {
     outputDir: "/workspace/dist",
     manifestPath: "/workspace/manifest.json",
     issues: [],
-    logs: [],
+    logs: [
+      {
+        level: "info",
+        message: "Quartz build finished.",
+        timestamp: "2026-03-18T11:11:13.000Z"
+      }
+    ],
     durationMs: 12
   };
 }

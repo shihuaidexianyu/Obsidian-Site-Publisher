@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { createDefaultPublisherRuntime } from "@osp/core";
 import type { PublisherOrchestrator } from "@osp/core";
-import type { BuildIssue, BuildResult, CliJsonResult, DeployResult, PreviewSession, PublisherConfig } from "@osp/shared";
+import type { BuildIssue, BuildLogEntry, BuildResult, CliJsonResult, DeployResult, PreviewSession, PublisherConfig } from "@osp/shared";
 
 import { createCliLogger, type CliLogger } from "./cli-logging.js";
 import { parseCliArguments, resolveCliConfig, supportedCommands } from "./config.js";
@@ -146,6 +146,8 @@ async function runScanCommand(orchestrator: CliOrchestrator, config: PublisherCo
 async function runBuildCommand(orchestrator: CliOrchestrator, config: PublisherConfig, reporter: CliReporter): Promise<number> {
   const result = await orchestrator.build(config);
 
+  writeBuildLogsToLogger(reporter, result.logs);
+
   if (reporter.json) {
     printJson(reporter, {
       command: "build",
@@ -186,6 +188,8 @@ async function runPreviewCommand(
 
 async function runDeployCommand(orchestrator: CliOrchestrator, config: PublisherConfig, reporter: CliReporter): Promise<number> {
   const build = await orchestrator.build(config);
+
+  writeBuildLogsToLogger(reporter, build.logs);
 
   if (!build.success) {
     if (reporter.json) {
@@ -237,6 +241,12 @@ function printBuildResult(reporter: CliReporter, result: BuildResult): void {
 
   if (lastLog !== undefined) {
     writeInfo(reporter, `Last log: [${lastLog.level}] ${lastLog.message}`);
+  }
+}
+
+function writeBuildLogsToLogger(reporter: CliReporter, logs: BuildLogEntry[]): void {
+  for (const log of logs) {
+    reporter.logger.entry(log.level === "warning" || log.level === "error" ? log.level : "info", `[build] ${log.message}`);
   }
 }
 

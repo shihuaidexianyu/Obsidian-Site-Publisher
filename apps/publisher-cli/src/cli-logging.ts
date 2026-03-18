@@ -3,6 +3,7 @@ import path from "node:path";
 
 export type CliLogger = {
   logPath: string;
+  entry(level: "info" | "warning" | "error", message: string): void;
   info(message: string): void;
   error(message: string): void;
   close(): Promise<void>;
@@ -19,7 +20,7 @@ export async function createCliLogger(input: {
 
   await mkdir(logDir, { recursive: true });
 
-  const write = (level: "INFO" | "ERROR", message: string): void => {
+  const write = (level: "INFO" | "WARNING" | "ERROR", message: string): void => {
     pendingWrite = pendingWrite.then(() =>
       appendFile(logPath, `[${new Date().toISOString()}] ${level} ${message}\n`, "utf8")
     );
@@ -29,6 +30,9 @@ export async function createCliLogger(input: {
 
   return {
     logPath,
+    entry(level: "info" | "warning" | "error", message: string): void {
+      write(level === "info" ? "INFO" : level === "warning" ? "WARNING" : "ERROR", message);
+    },
     info(message: string): void {
       write("INFO", message);
     },
