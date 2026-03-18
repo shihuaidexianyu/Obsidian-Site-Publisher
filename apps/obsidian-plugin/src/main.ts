@@ -44,6 +44,10 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
     this.addSettingTab(new PublisherPluginSettingTab(this.app, this));
   }
 
+  public override onunload(): void {
+    void this.shell.dispose();
+  }
+
   public async updateConfig(nextConfig: typeof this.settings): Promise<void> {
     this.settings = nextConfig;
     await savePluginSettings(this, {
@@ -54,6 +58,10 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
 
   public getConfig(): typeof this.settings {
     return this.settings;
+  }
+
+  public async updateConfigWith(updater: (currentConfig: typeof this.settings) => typeof this.settings): Promise<void> {
+    await this.updateConfig(updater(this.settings));
   }
 }
 
@@ -79,10 +87,10 @@ class PublisherPluginSettingTab extends PluginSettingTab {
         dropdown.addOption("folder", "Folder");
         dropdown.setValue(config.publishMode);
         dropdown.onChange(async (value) => {
-          await this.plugin.updateConfig({
-            ...config,
+          await this.plugin.updateConfigWith((currentConfig) => ({
+            ...currentConfig,
             publishMode: value === "folder" ? "folder" : "frontmatter"
-          });
+          }));
           this.display();
         });
       });
@@ -94,16 +102,16 @@ class PublisherPluginSettingTab extends PluginSettingTab {
         text.setPlaceholder("Public");
         text.setValue(config.publishRoot ?? "");
         text.onChange(async (value) => {
-          const nextConfig = { ...config };
+          await this.plugin.updateConfigWith((currentConfig) => {
+            const nextConfig = { ...currentConfig };
 
-          if (value.trim() === "") {
-            delete nextConfig.publishRoot;
-          } else {
-            nextConfig.publishRoot = value.trim();
-          }
+            if (value.trim() === "") {
+              delete nextConfig.publishRoot;
+            } else {
+              nextConfig.publishRoot = value.trim();
+            }
 
-          await this.plugin.updateConfig({
-            ...nextConfig
+            return nextConfig;
           });
         });
       });
@@ -114,36 +122,36 @@ class PublisherPluginSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setValue(config.outputDir);
         text.onChange(async (value) => {
-          await this.plugin.updateConfig({
-            ...config,
+          await this.plugin.updateConfigWith((currentConfig) => ({
+            ...currentConfig,
             outputDir: value.trim()
-          });
+          }));
         });
       });
 
     addToggleSetting(containerEl, "Strict mode", "Block preview and build on warnings too.", config.strictMode, async (value) => {
-      await this.plugin.updateConfig({
-        ...config,
+      await this.plugin.updateConfigWith((currentConfig) => ({
+        ...currentConfig,
         strictMode: value
-      });
+      }));
     });
     addToggleSetting(containerEl, "Enable search", "Expose Quartz search UI on the generated site.", config.enableSearch, async (value) => {
-      await this.plugin.updateConfig({
-        ...config,
+      await this.plugin.updateConfigWith((currentConfig) => ({
+        ...currentConfig,
         enableSearch: value
-      });
+      }));
     });
     addToggleSetting(containerEl, "Enable backlinks", "Expose backlinks on generated note pages.", config.enableBacklinks, async (value) => {
-      await this.plugin.updateConfig({
-        ...config,
+      await this.plugin.updateConfigWith((currentConfig) => ({
+        ...currentConfig,
         enableBacklinks: value
-      });
+      }));
     });
     addToggleSetting(containerEl, "Enable graph", "Expose the Quartz graph view.", config.enableGraph, async (value) => {
-      await this.plugin.updateConfig({
-        ...config,
+      await this.plugin.updateConfigWith((currentConfig) => ({
+        ...currentConfig,
         enableGraph: value
-      });
+      }));
     });
   }
 }

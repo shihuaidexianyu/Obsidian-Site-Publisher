@@ -40,6 +40,25 @@ describe("plugin settings", () => {
     });
   });
 
+  it("falls back to defaults when stored data does not match the schema", async () => {
+    const shell = new PublisherPluginShell(() => createRuntime());
+    const store = {
+      loadData: vi.fn(async () => ({
+        config: {
+          strictMode: "yes"
+        }
+      })),
+      saveData: vi.fn(async () => {})
+    };
+
+    const settings = await loadPluginSettings(store, shell, "/vault");
+
+    expect(settings.config).toMatchObject({
+      vaultRoot: "/vault",
+      strictMode: false
+    });
+  });
+
   it("persists settings through the provided store", async () => {
     const shell = new PublisherPluginShell(() => createRuntime());
     const settings = mergePluginSettings(shell, "/vault");

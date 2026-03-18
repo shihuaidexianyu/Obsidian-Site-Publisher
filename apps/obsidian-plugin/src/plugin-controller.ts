@@ -29,9 +29,24 @@ export class PluginCommandController {
   }
 
   public async runCommand(command: PluginCommand): Promise<void> {
-    const result = await this.shell.runCommand(command, this.getConfig());
+    try {
+      const result = await this.shell.runCommand(command, this.getConfig());
 
-    this.host.setStatus(result.statusMessage);
-    this.host.showNotice(result.statusMessage);
+      this.host.setStatus(result.statusMessage);
+      this.host.showNotice(result.statusMessage);
+    } catch (error) {
+      const message = formatPluginCommandError(command, error);
+
+      this.host.setStatus(message);
+      this.host.showNotice(message);
+    }
   }
+}
+
+function formatPluginCommandError(command: PluginCommand, error: unknown): string {
+  if (error instanceof Error) {
+    return `${command} failed: ${error.message}`;
+  }
+
+  return `${command} failed with an unknown error.`;
 }

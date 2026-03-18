@@ -28,6 +28,26 @@ describe("PluginCommandController", () => {
     expect(host.setStatus).toHaveBeenCalledWith("Preview ready at http://localhost:8080");
     expect(host.showNotice).toHaveBeenCalledWith("Preview ready at http://localhost:8080");
   });
+
+  it("surfaces command failures as readable host messages", async () => {
+    const host = createHost();
+    const shell = {
+      getCommandDefinitions: vi.fn(() => []),
+      runCommand: vi.fn(async () => {
+        throw new Error("Cannot preview in strict mode while 2 warning issue(s) remain unresolved.");
+      })
+    };
+    const controller = new PluginCommandController(shell, host, () => createConfig("/vault"));
+
+    await controller.runCommand("preview");
+
+    expect(host.setStatus).toHaveBeenCalledWith(
+      "preview failed: Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
+    );
+    expect(host.showNotice).toHaveBeenCalledWith(
+      "preview failed: Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
+    );
+  });
 });
 
 function createShell(options: { statusMessage?: string } = {}) {

@@ -65,6 +65,7 @@ const defaultState: PluginExecutionState = {
 
 export class PublisherPluginShell {
   private state: PluginExecutionState = defaultState;
+  private activePreviewRuntime: PluginRuntime | undefined;
 
   public constructor(private readonly createRuntime: () => PluginRuntime = createDefaultPublisherRuntime) {}
 
@@ -105,22 +106,20 @@ export class PublisherPluginShell {
     };
   }
 
-  public async runCommand(command: PluginCommand, config: PublisherConfig): Promise<PluginCommandResult> {
-    const runtime = this.createRuntime();
+  public async dispose(): Promise<void> {
+    await this.stopActivePreview();
+  }
 
-    try {
-      switch (command) {
-        case "issues":
-          return await this.runIssuesCommand(runtime.orchestrator, config);
-        case "build":
-          return await this.runBuildCommand(runtime.orchestrator, config);
-        case "preview":
-          return await this.runPreviewCommand(runtime.orchestrator, config);
-        case "publish":
-          return await this.runPublishCommand(runtime.orchestrator, config);
-      }
-    } finally {
-      await runtime.stop();
+  public async runCommand(command: PluginCommand, config: PublisherConfig): Promise<PluginCommandResult> {
+    switch (command) {
+      case "issues":
+        return this.withEphemeralRuntime(async (runtime) => this.runIssuesCommand(runtime.orchestrator, config));
+      case "build":
+        return this.withEphemeralRuntime(async (runtime) => this.runBuildCommand(runtime.orchestrator, config));
+      case "preview":
+        return this.runPreviewCommand(config);
+      case "publish":
+        return this.withEphemeralRuntime(async (runtime) => this.runPublishCommand(runtime.orchestrator, config));
     }
   }
 
@@ -174,28 +173,35 @@ export class PublisherPluginShell {
     };
   }
 
-  private async runPreviewCommand(
-    orchestrator: PluginOrchestrator,
-    config: PublisherConfig
-  ): Promise<Extract<PluginCommandResult, { command: "preview" }>> {
-    const session = await orchestrator.preview(config);
-    const statusMessage = `Preview ready at ${session.url}`;
+  private async runPreviewCommand(config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "preview" }>> {
+    await this.stopActivePreview();
 
-    this.updateState({
-      lastCommand: "preview",
-      statusMessage,
-      lastIssues: this.state.lastIssues,
-      lastLogs: [],
-      lastBuildResult: undefined,
-      lastPreviewSession: session,
-      lastDeployResult: undefined
-    });
+    const runtime = this.createRuntime();
 
-    return {
-      command: "preview",
-      session,
-      statusMessage
-    };
+    try {
+      const session = await runtime.orchestrator.preview(config);
+      const statusMessage = `Preview ready at ${session.url}`;
+
+      this.activePreviewRuntime = runtime;
+      this.updateState({
+        lastCommand: "preview",
+        statusMessage,
+        lastIssues: this.state.lastIssues,
+        lastLogs: [],
+        lastBuildResult: undefined,
+        lastPreviewSession: session,
+        lastDeployResult: undefined
+      });
+
+      return {
+        command: "preview",
+        session,
+        statusMessage
+      };
+    } catch (error) {
+      await runtime.stop();
+      throw error;
+    }
   }
 
   private async runPublishCommand(
@@ -253,6 +259,25 @@ export class PublisherPluginShell {
       lastIssues: nextState.lastIssues ?? this.state.lastIssues,
       lastLogs: nextState.lastLogs ?? this.state.lastLogs
     };
+  }
+
+  private async withEphemeralRuntime<T>(callback: (runtime: PluginRuntime) => Promise<T>): Promise<T> {
+    const runtime = this.createRuntime();
+
+    try {
+      return await callback(runtime);
+    } finally {
+      await runtime.stop();
+    }
+  }
+
+  private async stopActivePreview(): Promise<void> {
+    if (this.activePreviewRuntime === undefined) {
+      return;
+    }
+
+    await this.activePreviewRuntime.stop();
+    this.activePreviewRuntime = undefined;
   }
 }
 

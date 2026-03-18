@@ -99,6 +99,41 @@ describe("PublisherPluginShell", () => {
         url: "http://localhost:8080"
       }
     });
+    expect(runtime.stop).not.toHaveBeenCalled();
+  });
+
+  it("stops the previous preview before starting a new one", async () => {
+    const firstRuntime = createRuntime({
+      previewSession: {
+        url: "http://localhost:8080",
+        workspaceRoot: "/vault/.osp/preview-a",
+        startedAt: new Date().toISOString()
+      }
+    });
+    const secondRuntime = createRuntime({
+      previewSession: {
+        url: "http://localhost:8081",
+        workspaceRoot: "/vault/.osp/preview-b",
+        startedAt: new Date().toISOString()
+      }
+    });
+    const plugin = new PublisherPluginShell(vi.fn().mockReturnValueOnce(firstRuntime).mockReturnValueOnce(secondRuntime));
+
+    await plugin.runCommand("preview", createConfig("/vault"));
+    await plugin.runCommand("preview", createConfig("/vault"));
+
+    expect(firstRuntime.stop).toHaveBeenCalledOnce();
+    expect(secondRuntime.stop).not.toHaveBeenCalled();
+  });
+
+  it("disposes the active preview runtime when the shell is disposed", async () => {
+    const runtime = createRuntime();
+    const plugin = new PublisherPluginShell(() => runtime);
+
+    await plugin.runCommand("preview", createConfig("/vault"));
+    await plugin.dispose();
+
+    expect(runtime.stop).toHaveBeenCalledOnce();
   });
 
   it("runs publish as build plus deploy and stores the deploy result", async () => {
