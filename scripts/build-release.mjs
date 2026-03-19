@@ -21,6 +21,7 @@ const stagingRoot = path.join(releaseRoot, "staging");
 const cliDeployRoot = path.join(stagingRoot, "publisher-cli");
 const coreDeployRoot = path.join(stagingRoot, "core-runtime");
 const cliPackageRoot = path.join(stagingRoot, "publisher-cli-package");
+const externalRuntimeRoot = path.join(stagingRoot, "external-runtime");
 const nativeCliRoot = path.join(stagingRoot, "native-cli");
 const cliDeployRootRelative = path.relative(workspaceRoot, cliDeployRoot);
 const coreDeployRootRelative = path.relative(workspaceRoot, coreDeployRoot);
@@ -51,6 +52,8 @@ await materializeWorkspacePackage(path.join(workspaceRoot, "packages", "core"), 
 await copyReleaseEntry(cliDeployRoot, cliPackageRoot, "dist");
 await copyReleaseEntry(cliDeployRoot, cliPackageRoot, "package.json");
 await copyReleaseEntry(cliDeployRoot, cliPackageRoot, "tsconfig.json");
+await installExternalRuntimeDependencies(externalRuntimeRoot);
+await mergeDirectoryContents(path.join(externalRuntimeRoot, "node_modules"), path.join(cliPackageRoot, "node_modules"));
 const nativeCli = await buildNativeCli({
   outputDirectory: nativeCliRoot
 });
@@ -150,6 +153,69 @@ async function materializeWorkspacePackage(sourcePackageRoot, targetPackageRoot)
   await mkdir(targetPackageRoot, { recursive: true });
   await copyReleaseEntry(sourcePackageRoot, targetPackageRoot, "dist");
   await copyReleaseEntry(sourcePackageRoot, targetPackageRoot, "package.json");
+}
+
+async function installExternalRuntimeDependencies(targetRoot) {
+  const dependencies = await collectExternalRuntimeDependencies();
+
+  await rm(targetRoot, { recursive: true, force: true });
+  await mkdir(targetRoot, { recursive: true });
+  await writeFile(
+    path.join(targetRoot, "package.json"),
+    JSON.stringify(
+      {
+        name: "osp-external-runtime",
+        private: true,
+        type: "module",
+        dependencies
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  await runCommand("npm", ["install", "--omit=dev"], targetRoot);
+}
+
+async function collectExternalRuntimeDependencies() {
+  const packagesRoot = path.join(workspaceRoot, "packages");
+  const packageDirectories = await readdir(packagesRoot, { withFileTypes: true });
+  const dependencies = {};
+
+  for (const directory of packageDirectories) {
+    if (!directory.isDirectory()) {
+      continue;
+    }
+
+    const packageJsonPath = path.join(packagesRoot, directory.name, "package.json");
+    const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
+
+    for (const [dependencyName, dependencyVersion] of Object.entries(packageJson.dependencies ?? {})) {
+      if (dependencyName.startsWith("@osp/") || dependencyVersion.startsWith("workspace:")) {
+        continue;
+      }
+
+      dependencies[dependencyName] = dependencyVersion;
+    }
+  }
+
+  return dependencies;
+}
+
+async function mergeDirectoryContents(sourceDirectory, targetDirectory) {
+  await mkdir(targetDirectory, { recursive: true });
+
+  for (const entry of await readdir(sourceDirectory, { withFileTypes: true })) {
+    const sourcePath = path.join(sourceDirectory, entry.name);
+    const targetPath = path.join(targetDirectory, entry.name);
+
+    await cp(sourcePath, targetPath, {
+      recursive: true,
+      force: true,
+      dereference: true,
+      filter: (copiedPath) => shouldIncludeRuntimePath(path.relative(sourcePath, copiedPath))
+    });
+  }
 }
 
 async function copyReleaseEntry(sourceRoot, targetRoot, entryName) {
