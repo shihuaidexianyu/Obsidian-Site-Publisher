@@ -33,11 +33,12 @@ export function updateOptionalCliSetting<TKey extends "executablePath" | "logDir
   value: string
 ): PublisherPluginSettings["cli"] {
   const nextSettings = { ...currentSettings };
+  const normalizedValue = key === "executablePath" ? normalizeExecutablePath(value) : value.trim();
 
-  if (value.trim() === "") {
+  if (normalizedValue === "") {
     delete nextSettings[key];
   } else {
-    nextSettings[key] = value.trim();
+    nextSettings[key] = normalizedValue;
   }
 
   return nextSettings;
@@ -84,4 +85,19 @@ export function updatePreviewPortSetting(
   }
 
   return nextSettings;
+}
+
+function normalizeExecutablePath(value: string): string {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.length >= 2) {
+    const firstCharacter = trimmedValue[0];
+    const lastCharacter = trimmedValue.at(-1);
+
+    if ((firstCharacter === "\"" || firstCharacter === "'") && firstCharacter === lastCharacter) {
+      return trimmedValue.slice(1, -1).trim();
+    }
+  }
+
+  return trimmedValue;
 }

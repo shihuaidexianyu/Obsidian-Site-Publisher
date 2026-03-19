@@ -37,6 +37,24 @@ describe("CliPluginBackend", () => {
     expect(result.logPath).toBe(path.join(pluginRoot, ".osp", "logs", "build.log"));
   });
 
+  it("accepts a quoted external CLI path", async () => {
+    const pluginRoot = await createTempDirectory();
+    const cliEntrypoint = path.join(pluginRoot, "cli.js");
+
+    await writeFile(cliEntrypoint, createFakeCliScript(), "utf8");
+
+    const backend = new CliPluginBackend({
+      cliCommand: `"${cliEntrypoint}"`,
+      logDirectory: path.join(pluginRoot, ".osp", "logs"),
+      previewPort: 43180
+    });
+
+    const result = await backend.build(createConfig(pluginRoot));
+
+    expect(result.result.success).toBe(true);
+    expect(result.logPath).toBe(path.join(pluginRoot, ".osp", "logs", "build.log"));
+  });
+
   it("keeps preview alive until the backend is disposed", async () => {
     const pluginRoot = await createTempDirectory();
     const cliEntrypoint = path.join(pluginRoot, "cli.js");

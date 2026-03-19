@@ -304,8 +304,10 @@ function createCliChild(
     cwd: string;
   }
 ): CliChildProcess {
-  if (/\.(c|m)?js$/iu.test(cliCommand)) {
-    return spawn(resolveNodeCommand(), [cliCommand, ...args], {
+  const normalizedCliCommand = normalizeCliCommand(cliCommand);
+
+  if (/\.(c|m)?js$/iu.test(normalizedCliCommand)) {
+    return spawn(resolveNodeCommand(), [normalizedCliCommand, ...args], {
       cwd: options.cwd,
       env: {
         ...process.env
@@ -315,8 +317,8 @@ function createCliChild(
     });
   }
 
-  if (process.platform === "win32" && /\.(cmd|bat)$/iu.test(cliCommand)) {
-    return spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", buildCommandLine(cliCommand, args)], {
+  if (process.platform === "win32" && /\.(cmd|bat)$/iu.test(normalizedCliCommand)) {
+    return spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", buildCommandLine(normalizedCliCommand, args)], {
       cwd: options.cwd,
       env: {
         ...process.env
@@ -326,7 +328,7 @@ function createCliChild(
     });
   }
 
-  return spawn(cliCommand, args, {
+  return spawn(normalizedCliCommand, args, {
     cwd: options.cwd,
     env: {
       ...process.env
@@ -346,4 +348,19 @@ function buildCommandLine(command: string, args: string[]): string {
 
 function quoteShellArgument(argument: string): string {
   return /[\s"]/u.test(argument) ? `"${argument.replace(/"/g, '\\"')}"` : argument;
+}
+
+function normalizeCliCommand(cliCommand: string): string {
+  const trimmedCommand = cliCommand.trim();
+
+  if (trimmedCommand.length >= 2) {
+    const firstCharacter = trimmedCommand[0];
+    const lastCharacter = trimmedCommand.at(-1);
+
+    if ((firstCharacter === "\"" || firstCharacter === "'") && firstCharacter === lastCharacter) {
+      return trimmedCommand.slice(1, -1).trim();
+    }
+  }
+
+  return trimmedCommand;
 }
