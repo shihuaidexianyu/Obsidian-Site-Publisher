@@ -252,6 +252,43 @@ Default vault-local locations:
 
 The plugin shows only lightweight summaries. Full logs are written to the CLI log files.
 
+## Releasing
+
+### Build release artifacts locally
+
+Use the following command to generate the platform-specific release package on your current machine:
+
+```bash
+corepack pnpm build:release
+```
+
+The generated files are written to:
+
+```text
+.release/v<version>/artifacts/
+```
+
+### Publish a GitHub Release from the cloud
+
+This repository includes a GitHub Actions workflow at [`.github/workflows/build-release.yml`](.github/workflows/build-release.yml).
+
+You can trigger it in two ways:
+
+1. Push a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+2. Run the workflow manually from GitHub Actions and fill in `release_tag`, for example `v0.1.0`.
+
+When triggered with a `v*` tag or a manual `release_tag`, the workflow will:
+
+- build release artifacts on Windows, macOS, and Linux
+- create a GitHub Release
+- upload the generated `.zip` files to the Release assets
+
 ## Development
 
 Useful commands:

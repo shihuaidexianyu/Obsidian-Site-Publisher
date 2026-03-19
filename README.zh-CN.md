@@ -252,6 +252,43 @@ publisher-cli build --config ./publisher.config.json
 
 插件侧边栏只显示轻量摘要，完整日志请查看 CLI 生成的日志文件。
 
+## 发布方式
+
+### 在本地构建发行包
+
+在当前机器上构建当前平台对应的发行包：
+
+```bash
+corepack pnpm build:release
+```
+
+生成文件位于：
+
+```text
+.release/v<version>/artifacts/
+```
+
+### 通过云端创建 GitHub Release
+
+仓库已经包含 GitHub Actions 工作流：[`.github/workflows/build-release.yml`](.github/workflows/build-release.yml)。
+
+可以通过两种方式触发：
+
+1. 推送版本标签：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+2. 在 GitHub Actions 中手动运行 workflow，并填写 `release_tag`，例如 `v0.1.0`。
+
+当使用 `v*` 标签或手动填写 `release_tag` 触发时，workflow 会：
+
+- 在 Windows、macOS、Linux 上构建发行包
+- 自动创建 GitHub Release
+- 将生成的 `.zip` 文件上传到 Release assets
+
 ## 开发命令
 
 常用命令：
