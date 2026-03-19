@@ -220,6 +220,40 @@ describe("FileSystemVaultParser", () => {
       slug: "Topic/Guide"
     });
   });
+
+
+  it("does not collect dotted note wikilinks as assets", async () => {
+    const vaultRoot = await createTempVault();
+
+    await mkdir(path.join(vaultRoot, "人工智能", "机器学习", "白板推导"), { recursive: true });
+    await writeFile(
+      path.join(vaultRoot, "人工智能", "机器学习", "白板推导", "index.md"),
+      `[[1.Intro_Math]]
+[[2.LinearRegression]]
+[[guide.pdf]]
+`,
+      "utf8"
+    );
+    await writeFile(path.join(vaultRoot, "人工智能", "机器学习", "白板推导", "1.Intro_Math.md"), "# Intro", "utf8");
+    await writeFile(path.join(vaultRoot, "人工智能", "机器学习", "白板推导", "2.LinearRegression.md"), "# Linear", "utf8");
+    await writeFile(path.join(vaultRoot, "人工智能", "机器学习", "白板推导", "guide.pdf"), "pdf", "utf8");
+
+    const result = await new FileSystemVaultParser().scanVault({
+      vaultRoot,
+      config: createConfig(vaultRoot)
+    });
+
+    const indexNote = result.manifest.notes.find((note) => note.path === "人工智能/机器学习/白板推导/index.md");
+
+    expect(indexNote).toMatchObject({
+      links: [
+        { target: "1.Intro_Math", kind: "wikilink" },
+        { target: "2.LinearRegression", kind: "wikilink" },
+        { target: "guide.pdf", kind: "wikilink" }
+      ],
+      assets: [{ path: "guide.pdf", kind: "pdf" }]
+    });
+  });
 });
 
 function createConfig(vaultRoot: string): PublisherConfig {

@@ -13,6 +13,14 @@ const trailingHeadingMarkerPattern = /\s+#+\s*$/;
 const blockIdPattern = /\^([A-Za-z0-9-]+)\s*$/;
 const externalTargetPattern = /^[a-z][a-z0-9+.-]*:/i;
 
+const knownBareAssetExtensions = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif",
+  ".mp3", ".wav", ".ogg", ".m4a", ".flac",
+  ".mp4", ".webm", ".mov", ".avi", ".mkv",
+  ".pdf", ".csv", ".tsv", ".json", ".txt", ".zip", ".gz", ".tar",
+  ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".ipynb"
+]);
+
 export function analyzeMarkdownContent(markdownSource: string): MarkdownAnalysis {
   const content = stripLeadingFrontmatter(markdownSource);
   const headings: HeadingRecord[] = [];
@@ -298,9 +306,14 @@ function isAssetTarget(target: string): boolean {
     return false;
   }
 
+  const assetPath = stripAnchor(target);
   const extension = getTargetExtension(target);
 
-  return extension !== "" && extension !== ".md";
+  if (extension === "" || extension === ".md") {
+    return false;
+  }
+
+  return knownBareAssetExtensions.has(extension);
 }
 
 function inferAssetKind(target: string): AssetRef["kind"] {

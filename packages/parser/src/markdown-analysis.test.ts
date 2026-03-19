@@ -78,4 +78,18 @@ Paragraph with block.^block-id
     expect(result.embeds).toEqual([]);
     expect(result.assets).toEqual([]);
   });
+
+
+  it("treats dotted wikilinks as note links instead of missing assets", () => {
+    const result = analyzeMarkdownContent(`[[1.Intro_Math]]
+[[Topic/2.LinearRegression]]
+[[guide.pdf]]`);
+
+    expect(result.links.map((link) => link.target)).toEqual([
+      "1.Intro_Math",
+      "Topic/2.LinearRegression",
+      "guide.pdf"
+    ]);
+    expect(result.assets).toEqual([{ path: "guide.pdf", kind: "pdf" }]);
+  });
 });

@@ -2,6 +2,14 @@ import path from "node:path";
 
 import type { NoteRecord } from "@osp/shared";
 
+const knownBareAssetExtensions = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif",
+  ".mp3", ".wav", ".ogg", ".m4a", ".flac",
+  ".mp4", ".webm", ".mov", ".avi", ".mkv",
+  ".pdf", ".csv", ".tsv", ".json", ".txt", ".zip", ".gz", ".tar",
+  ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".ipynb"
+]);
+
 export type NoteIndex = {
   byAliasOrName: Map<string, NoteRecord[]>;
   byPath: Map<string, NoteRecord>;
@@ -113,7 +121,11 @@ export function isAssetTarget(target: string): boolean {
   const noteTarget = splitLinkTarget(target).noteTarget;
   const extension = path.posix.extname(noteTarget).toLowerCase();
 
-  return extension !== "" && extension !== ".md";
+  if (extension === "" || extension === ".md") {
+    return false;
+  }
+
+  return knownBareAssetExtensions.has(extension);
 }
 
 export function slugifyAnchor(anchor: string): string {

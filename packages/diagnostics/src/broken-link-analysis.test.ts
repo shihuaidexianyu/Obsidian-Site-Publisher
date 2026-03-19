@@ -55,6 +55,38 @@ describe("analyzeBrokenLinks", () => {
     expect(issues[1]?.message).toContain('Heading reference "Source#Missing Heading"');
     expect(issues[2]?.message).toContain('Block reference "Source#^missing-block"');
   });
+
+
+  it("resolves dotted wikilinks as notes instead of skipping them as assets", () => {
+    const manifest: VaultManifest = {
+      generatedAt: new Date().toISOString(),
+      vaultRoot: "/vault",
+      notes: [
+        createNote({
+          path: "Index.md",
+          links: [
+            createLink("[[1.Intro_Math]]", "1.Intro_Math", "wikilink", 1),
+            createLink("[[Missing.Note]]", "Missing.Note", "wikilink", 2),
+            createLink("[[guide.pdf]]", "guide.pdf", "wikilink", 3)
+          ]
+        }),
+        createNote({
+          path: "1.Intro_Math.md"
+        })
+      ],
+      assetFiles: [],
+      unsupportedObjects: []
+    };
+
+    const issues = analyzeBrokenLinks(manifest);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      code: "BROKEN_LINK",
+      file: "Index.md"
+    });
+    expect(issues[0]?.message).toContain('Link target "Missing.Note"');
+  });
 });
 
 function createNote(overrides: Partial<NoteRecord> & Pick<NoteRecord, "path">): NoteRecord {
