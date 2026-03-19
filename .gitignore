@@ -13,3 +13,4 @@ coverage/
 .release/
 .tmp-*/
 .tmp-*
+test_vault/
