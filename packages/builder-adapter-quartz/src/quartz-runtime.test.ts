@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveQuartzNodeModulesPath } from "./quartz-runtime.js";
+import { resolveQuartzPackageNodeModulesPath, resolveWorkspaceNodeModulesPath } from "./quartz-runtime.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -16,14 +16,14 @@ afterEach(async () => {
   );
 });
 
-describe("resolveQuartzNodeModulesPath", () => {
-  it("prefers the pnpm virtual store layout when present", async () => {
+describe("resolveWorkspaceNodeModulesPath", () => {
+  it("prefers the broader workspace node_modules layout when present", async () => {
     const quartzPackageRoot = await createDirectoryTree([
       ".pnpm/node_modules",
       ".pnpm/@jackyzha0+quartz/node_modules/@jackyzha0/quartz"
     ]);
 
-    expect(await resolveQuartzNodeModulesPath(quartzPackageRoot)).toBe(
+    expect(await resolveWorkspaceNodeModulesPath(quartzPackageRoot)).toBe(
       path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules")
     );
   });
@@ -31,7 +31,24 @@ describe("resolveQuartzNodeModulesPath", () => {
   it("falls back to a flat node_modules directory for vendored plugin runtimes", async () => {
     const quartzPackageRoot = await createDirectoryTree(["node_modules/@jackyzha0/quartz"]);
 
-    expect(await resolveQuartzNodeModulesPath(quartzPackageRoot)).toBe(path.resolve(quartzPackageRoot, "..", ".."));
+    expect(await resolveWorkspaceNodeModulesPath(quartzPackageRoot)).toBe(path.resolve(quartzPackageRoot, "..", ".."));
+  });
+});
+
+describe("resolveQuartzPackageNodeModulesPath", () => {
+  it("prefers Quartz's colocated pnpm node_modules when present", async () => {
+    const quartzPackageRoot = await createDirectoryTree([
+      ".pnpm/node_modules",
+      ".pnpm/@jackyzha0+quartz/node_modules/@jackyzha0/quartz"
+    ]);
+
+    expect(await resolveQuartzPackageNodeModulesPath(quartzPackageRoot)).toBe(path.resolve(quartzPackageRoot, "..", ".."));
+  });
+
+  it("falls back to a flat node_modules directory for vendored plugin runtimes", async () => {
+    const quartzPackageRoot = await createDirectoryTree(["node_modules/@jackyzha0/quartz"]);
+
+    expect(await resolveQuartzPackageNodeModulesPath(quartzPackageRoot)).toBe(path.resolve(quartzPackageRoot, "..", ".."));
   });
 });
 

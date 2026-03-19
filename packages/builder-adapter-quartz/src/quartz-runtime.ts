@@ -10,6 +10,9 @@ export async function ensureQuartzWorkspaceRuntime(
   config: PublisherConfig,
   quartzPackageRoot: string
 ): Promise<void> {
+  const workspaceNodeModulesPath = await resolveWorkspaceNodeModulesPath(quartzPackageRoot);
+  const quartzPackageNodeModulesPath = await resolveQuartzPackageNodeModulesPath(quartzPackageRoot);
+
   await mkdir(workspace.rootDir, { recursive: true });
   await ensureQuartzWorkspaceGitBoundary(workspace.rootDir);
   await cp(path.join(quartzPackageRoot, "quartz"), path.join(workspace.rootDir, "quartz"), {
@@ -23,8 +26,8 @@ export async function ensureQuartzWorkspaceRuntime(
     });
   }
 
-  await ensureNodeModulesLink(workspace.rootDir, await resolveQuartzNodeModulesPath(quartzPackageRoot));
-  await ensureQuartzPackageNodeModulesLink(workspace.rootDir, quartzPackageRoot);
+  await ensureNodeModulesLink(workspace.rootDir, workspaceNodeModulesPath);
+  await ensureQuartzPackageNodeModulesLink(workspace.rootDir, quartzPackageNodeModulesPath);
   await writeFile(path.join(workspace.rootDir, "quartz.config.ts"), renderQuartzConfig(config), "utf8");
   await writeFile(path.join(workspace.rootDir, "quartz.layout.ts"), renderQuartzLayout(config), "utf8");
 }
@@ -54,15 +57,8 @@ async function ensureNodeModulesLink(workspaceRoot: string, sourceNodeModulesPat
   await symlink(sourceNodeModulesPath, linkPath, "junction");
 }
 
-async function ensureQuartzPackageNodeModulesLink(workspaceRoot: string, quartzPackageRoot: string): Promise<void> {
-  const quartzPackageNodeModulesPath = path.join(quartzPackageRoot, "node_modules");
+async function ensureQuartzPackageNodeModulesLink(workspaceRoot: string, sourceNodeModulesPath: string): Promise<void> {
   const workspaceQuartzNodeModulesPath = path.join(workspaceRoot, "quartz", "node_modules");
-
-  try {
-    await access(quartzPackageNodeModulesPath);
-  } catch {
-    return;
-  }
 
   try {
     const stats = await lstat(workspaceQuartzNodeModulesPath);
@@ -76,15 +72,28 @@ async function ensureQuartzPackageNodeModulesLink(workspaceRoot: string, quartzP
     // No existing Quartz-local node_modules entry in the staging workspace.
   }
 
-  await symlink(quartzPackageNodeModulesPath, workspaceQuartzNodeModulesPath, "junction");
+  await symlink(sourceNodeModulesPath, workspaceQuartzNodeModulesPath, "junction");
 }
 
-export async function resolveQuartzNodeModulesPath(quartzPackageRoot: string): Promise<string> {
+export async function resolveWorkspaceNodeModulesPath(quartzPackageRoot: string): Promise<string> {
   const candidatePaths = [
     path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules"),
     path.resolve(quartzPackageRoot, "..", "..")
   ];
 
+  return resolveNodeModulesPath(candidatePaths, quartzPackageRoot);
+}
+
+export async function resolveQuartzPackageNodeModulesPath(quartzPackageRoot: string): Promise<string> {
+  const candidatePaths = [
+    path.resolve(quartzPackageRoot, "..", ".."),
+    path.resolve(quartzPackageRoot, "..", "..", "..", "..", "node_modules")
+  ];
+
+  return resolveNodeModulesPath(candidatePaths, quartzPackageRoot);
+}
+
+async function resolveNodeModulesPath(candidatePaths: string[], quartzPackageRoot: string): Promise<string> {
   for (const candidatePath of candidatePaths) {
     try {
       await access(candidatePath);

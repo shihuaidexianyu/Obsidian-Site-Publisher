@@ -57,7 +57,7 @@ describe("external CLI helpers", () => {
 
     try {
       const bundledCliPath = path.join(pluginRoot, "bin", process.platform === "win32" ? "publisher-cli.exe" : "publisher-cli");
-      const quartzPackageRoot = path.join(pluginRoot, "bin", "runtime", "node_modules", "@jackyzha0", "quartz");
+      const quartzPackageRoot = path.join(pluginRoot, "bin", "runtime", "app", "node_modules", "@jackyzha0", "quartz");
 
       await mkdir(path.dirname(bundledCliPath), { recursive: true });
       await writeFile(bundledCliPath, "stub", "utf8");
