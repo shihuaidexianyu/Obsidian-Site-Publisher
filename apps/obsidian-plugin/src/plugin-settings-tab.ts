@@ -26,7 +26,7 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
   public display(): void {
     const { containerEl } = this;
     const settings = this.plugin.getSettings();
-    const { config, cli } = settings;
+    const { config, cli, ui } = settings;
 
     containerEl.empty();
     containerEl.createEl("h2", {
@@ -262,6 +262,15 @@ export class PublisherPluginSettingTab extends PluginSettingTab {
         config: {
           ...currentSettings.config,
           enableGraph: value
+        }
+      }));
+    });
+    addToggleSetting(containerEl, "显示信息级问题", "默认隐藏仅供提示的 info 级问题，例如未渲染的 Canvas 提示。", ui.showInformationalIssues, async (value) => {
+      await this.plugin.updateSettingsWith((currentSettings) => ({
+        ...currentSettings,
+        ui: {
+          ...currentSettings.ui,
+          showInformationalIssues: value
         }
       }));
     });

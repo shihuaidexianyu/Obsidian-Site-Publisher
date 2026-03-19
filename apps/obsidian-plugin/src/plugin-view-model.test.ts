@@ -28,12 +28,12 @@ describe("plugin view model", () => {
       ]
     });
 
-    expect(createIssuePanelMeta(state)).toEqual({
+    expect(createIssuePanelMeta(state, { showInformationalIssues: false })).toEqual({
       title: "发布问题",
       summary: "最近一次结果里有 1 个问题 | 最近命令：检查问题 | 更新时间：2026-03-18T13:00:00.000Z",
       emptyMessage: "运行“检查发布问题”或“构建站点”后，可在这里查看阻断项。"
     });
-    expect(createIssuePanelItems(state)).toEqual([
+    expect(createIssuePanelItems(state, { showInformationalIssues: false })).toEqual([
       {
         badge: "ERROR · BROKEN_LINK",
         fileLabel: "Broken.md:3:7",
@@ -41,6 +41,39 @@ describe("plugin view model", () => {
         suggestion: "Publish the target note or fix the link."
       }
     ]);
+  });
+
+  it("hides informational issues by default while allowing them to be shown", () => {
+    const state = createState({
+      lastCommand: "issues",
+      lastUpdatedAt: "2026-03-18T13:00:00.000Z",
+      lastIssues: [
+        {
+          code: "UNSUPPORTED_CANVAS",
+          severity: "info",
+          file: "Map.canvas",
+          message: "Canvas is reported only.",
+          suggestion: "Ignore it."
+        },
+        {
+          code: "BROKEN_LINK",
+          severity: "error",
+          file: "Broken.md",
+          message: "Link target is missing."
+        }
+      ]
+    });
+
+    expect(createIssuePanelMeta(state, { showInformationalIssues: false }).summary).toContain("最近一次结果里有 1 个问题");
+    expect(createIssuePanelItems(state, { showInformationalIssues: false })).toEqual([
+      {
+        badge: "ERROR · BROKEN_LINK",
+        fileLabel: "Broken.md",
+        message: "Link target is missing."
+      }
+    ]);
+
+    expect(createIssuePanelItems(state, { showInformationalIssues: true })).toHaveLength(2);
   });
 
   it("formats logs into stable panel items", () => {

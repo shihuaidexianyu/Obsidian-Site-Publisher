@@ -22,7 +22,10 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   private shell = new PublisherPluginShell();
   private settings: PublisherPluginSettings = {
     config: this.shell.createInitialConfig(""),
-    cli: {}
+    cli: {},
+    ui: {
+      showInformationalIssues: false
+    }
   };
   private statusBarEl?: HTMLElement;
   private controller?: PluginCommandController;
@@ -91,7 +94,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   }
 
   private registerWorkspaceViews(): void {
-    this.registerView(ISSUE_LIST_VIEW_TYPE, (leaf) => new IssueListView(leaf, () => this.shell.getState()));
+    this.registerView(ISSUE_LIST_VIEW_TYPE, (leaf) => new IssueListView(leaf, () => this.shell.getState(), () => this.settings.ui));
     this.registerView(BUILD_LOG_VIEW_TYPE, (leaf) => new BuildLogView(leaf, () => this.shell.getState()));
   }
 

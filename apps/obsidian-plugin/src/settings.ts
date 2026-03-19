@@ -8,6 +8,7 @@ import type { PublisherPluginShell } from "./plugin-shell.js";
 export type PublisherPluginSettings = {
   config: PublisherConfig;
   cli: PublisherPluginCliSettings;
+  ui: PublisherPluginUiSettings;
 };
 
 export type PublisherPluginCliSettings = {
@@ -16,9 +17,14 @@ export type PublisherPluginCliSettings = {
   previewPort?: number | undefined;
 };
 
+export type PublisherPluginUiSettings = {
+  showInformationalIssues: boolean;
+};
+
 export type StoredPublisherPluginSettings = {
   config?: Partial<PublisherConfig> | undefined;
   cli?: PublisherPluginCliSettings | undefined;
+  ui?: Partial<PublisherPluginUiSettings> | undefined;
 };
 
 export type PluginDataStore = {
@@ -32,9 +38,13 @@ const PublisherPluginCliSettingsSchema = z.object({
   logDirectory: z.string().optional(),
   previewPort: z.number().int().positive().optional()
 });
+const PublisherPluginUiSettingsSchema = z.object({
+  showInformationalIssues: z.boolean().optional()
+});
 export const StoredPublisherPluginSettingsSchema = z.object({
   config: PartialPublisherConfigSchema.optional(),
-  cli: PublisherPluginCliSettingsSchema.optional()
+  cli: PublisherPluginCliSettingsSchema.optional(),
+  ui: PublisherPluginUiSettingsSchema.optional()
 });
 
 export async function loadPluginSettings(
@@ -65,7 +75,10 @@ export function mergePluginSettings(
       ...storedData?.config,
       vaultRoot
     },
-    cli: storedData?.cli ?? {}
+    cli: storedData?.cli ?? {},
+    ui: {
+      showInformationalIssues: storedData?.ui?.showInformationalIssues ?? false
+    }
   };
 }
 
@@ -74,7 +87,8 @@ function normalizeStoredPluginSettings(
 ): StoredPublisherPluginSettings {
   return {
     config: normalizeConfig(storedData.config),
-    cli: normalizeCliSettings(storedData.cli)
+    cli: normalizeCliSettings(storedData.cli),
+    ui: normalizeUiSettings(storedData.ui)
   };
 }
 
@@ -100,6 +114,21 @@ function normalizeCliSettings(
   const normalizedSettings = Object.fromEntries(
     Object.entries(settings).filter(([, value]) => value !== undefined)
   ) as PublisherPluginCliSettings;
+
+  return Object.keys(normalizedSettings).length > 0 ? normalizedSettings : undefined;
+}
+
+
+function normalizeUiSettings(
+  settings: z.output<typeof PublisherPluginUiSettingsSchema> | undefined
+): Partial<PublisherPluginUiSettings> | undefined {
+  if (settings === undefined) {
+    return undefined;
+  }
+
+  const normalizedSettings = Object.fromEntries(
+    Object.entries(settings).filter(([, value]) => value !== undefined)
+  ) as Partial<PublisherPluginUiSettings>;
 
   return Object.keys(normalizedSettings).length > 0 ? normalizedSettings : undefined;
 }

@@ -1,6 +1,7 @@
 import type { BuildIssue, BuildLogEntry } from "@osp/shared";
 
 import type { PluginExecutionState } from "./plugin-shell.js";
+import type { PublisherPluginUiSettings } from "./settings.js";
 
 export type PanelMeta = {
   title: string;
@@ -23,16 +24,22 @@ export type LogPanelItem = {
 
 const maxVisibleLogEntries = 40;
 
-export function createIssuePanelMeta(state: PluginExecutionState): PanelMeta {
+export function createIssuePanelMeta(state: PluginExecutionState, ui: PublisherPluginUiSettings): PanelMeta {
+  const visibleIssues = filterVisibleIssues(state, ui);
+
+  const hiddenInformationalIssues = !ui.showInformationalIssues && visibleIssues.length === 0 && state.lastIssues.length > 0;
+
   return {
     title: "发布问题",
-    summary: createSummaryText(state, `最近一次结果里有 ${state.lastIssues.length} 个问题`),
-    emptyMessage: "运行“检查发布问题”或“构建站点”后，可在这里查看阻断项。"
+    summary: createSummaryText(state, `最近一次结果里有 ${visibleIssues.length} 个问题`),
+    emptyMessage: hiddenInformationalIssues
+      ? "当前没有需要处理的问题。信息级提示默认已隐藏，可在设置中开启显示。"
+      : "运行“检查发布问题”或“构建站点”后，可在这里查看阻断项。"
   };
 }
 
-export function createIssuePanelItems(state: PluginExecutionState): IssuePanelItem[] {
-  return state.lastIssues.map((issue) => {
+export function createIssuePanelItems(state: PluginExecutionState, ui: PublisherPluginUiSettings): IssuePanelItem[] {
+  return filterVisibleIssues(state, ui).map((issue) => {
     const item: IssuePanelItem = {
       badge: `${issue.severity.toUpperCase()} · ${issue.code}`,
       fileLabel: createIssueFileLabel(issue),
@@ -64,6 +71,14 @@ export function createLogPanelItems(state: PluginExecutionState): LogPanelItem[]
     timestamp: formatTimestamp(entry),
     message: entry.message
   }));
+}
+
+function filterVisibleIssues(state: PluginExecutionState, ui: PublisherPluginUiSettings): typeof state.lastIssues {
+  if (ui.showInformationalIssues) {
+    return state.lastIssues;
+  }
+
+  return state.lastIssues.filter((issue) => issue.severity !== "info");
 }
 
 function createSummaryText(state: PluginExecutionState, fallback: string): string {

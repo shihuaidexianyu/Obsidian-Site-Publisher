@@ -10,14 +10,16 @@ import {
   type PanelMeta
 } from "./plugin-view-model.js";
 import type { PluginExecutionState } from "./plugin-shell.js";
+import type { PublisherPluginUiSettings } from "./settings.js";
 
 export const ISSUE_LIST_VIEW_TYPE = "osp-issues-view";
 export const BUILD_LOG_VIEW_TYPE = "osp-build-logs-view";
 
 type StateReader = () => PluginExecutionState;
+type UiSettingsReader = () => PublisherPluginUiSettings;
 
 export class IssueListView extends ItemView {
-  public constructor(leaf: WorkspaceLeaf, private readonly readState: StateReader) {
+  public constructor(leaf: WorkspaceLeaf, private readonly readState: StateReader, private readonly readUi: UiSettingsReader) {
     super(leaf);
   }
 
@@ -38,7 +40,7 @@ export class IssueListView extends ItemView {
   }
 
   public refresh(): void {
-    renderIssuePanel(this.contentEl, this.readState());
+    renderIssuePanel(this.contentEl, this.readState(), this.readUi());
   }
 }
 
@@ -68,9 +70,9 @@ export class BuildLogView extends ItemView {
   }
 }
 
-function renderIssuePanel(containerEl: HTMLElement, state: PluginExecutionState): void {
-  const meta = createIssuePanelMeta(state);
-  const items = createIssuePanelItems(state);
+function renderIssuePanel(containerEl: HTMLElement, state: PluginExecutionState, ui: PublisherPluginUiSettings): void {
+  const meta = createIssuePanelMeta(state, ui);
+  const items = createIssuePanelItems(state, ui);
 
   renderPanel(containerEl, meta, items, (parent, item) => {
     parent.createEl("div", {

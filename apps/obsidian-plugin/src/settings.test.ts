@@ -58,6 +58,7 @@ describe("plugin settings", () => {
       outputDir: "/vault/.osp/dist"
     });
     expect(settings.cli).toEqual({});
+    expect(settings.ui).toEqual({ showInformationalIssues: false });
   });
 
   it("falls back to defaults when stored data does not match the schema", async () => {
@@ -78,6 +79,7 @@ describe("plugin settings", () => {
       strictMode: false
     });
     expect(settings.cli).toEqual({});
+    expect(settings.ui).toEqual({ showInformationalIssues: false });
   });
 
   it("persists settings through the provided store", async () => {
@@ -107,6 +109,9 @@ describe("plugin settings", () => {
           executablePath: "./tools/publisher-cli",
           logDirectory: "./logs",
           previewPort: 8088
+        },
+        ui: {
+          showInformationalIssues: true
         }
       })),
       saveData: vi.fn(async () => {})
@@ -125,6 +130,7 @@ describe("plugin settings", () => {
       logDirectory: "./logs",
       previewPort: 8088
     });
+    expect(settings.ui).toEqual({ showInformationalIssues: true });
   });
 });
 
