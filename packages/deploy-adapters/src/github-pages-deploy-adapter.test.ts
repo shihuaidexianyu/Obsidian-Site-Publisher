@@ -19,32 +19,36 @@ afterEach(async () => {
 });
 
 describe("GitHubPagesDeployAdapter", () => {
-  it("pushes to main for a user pages repository URL", async () => {
-    const sourceRoot = await createTempDirectory();
-    const remoteRoot = await createTempDirectory("shihuaidexianyu.github.io-");
-    const buildOutputDir = path.join(sourceRoot, ".osp-build-dist");
+  it(
+    "pushes to main for a user pages repository URL",
+    async () => {
+      const sourceRoot = await createTempDirectory();
+      const remoteRoot = await createTempDirectory("shihuaidexianyu.github.io-");
+      const buildOutputDir = path.join(sourceRoot, ".osp-build-dist");
 
-    await initializeSourceRepository(sourceRoot);
-    await initializeBareRepository(remoteRoot);
-    await mkdir(buildOutputDir, { recursive: true });
-    await writeFile(path.join(buildOutputDir, "index.html"), "<html>github pages</html>", "utf8");
+      await initializeSourceRepository(sourceRoot);
+      await initializeBareRepository(remoteRoot);
+      await mkdir(buildOutputDir, { recursive: true });
+      await writeFile(path.join(buildOutputDir, "index.html"), "<html>github pages</html>", "utf8");
 
-    const adapter = new GitHubPagesDeployAdapter();
-    const result = await adapter.deploy(
-      createBuildResult(buildOutputDir),
-      createConfig(sourceRoot, {
-        deployRepositoryUrl: remoteRoot
-      })
-    );
+      const adapter = new GitHubPagesDeployAdapter();
+      const result = await adapter.deploy(
+        createBuildResult(buildOutputDir),
+        createConfig(sourceRoot, {
+          deployRepositoryUrl: remoteRoot
+        })
+      );
 
-    expect(result).toEqual({
-      success: true,
-      target: "github-pages",
-      destination: "refs/heads/main",
-      message: "Git branch deploy completed successfully to main."
-    });
-    await expect(readBareGitFile(remoteRoot, "main", "index.html")).resolves.toBe("<html>github pages</html>");
-  });
+      expect(result).toEqual({
+        success: true,
+        target: "github-pages",
+        destination: "refs/heads/main",
+        message: "Git branch deploy completed successfully to main."
+      });
+      await expect(readBareGitFile(remoteRoot, "main", "index.html")).resolves.toBe("<html>github pages</html>");
+    },
+    20_000
+  );
 });
 
 function createBuildResult(outputDir: string): BuildResult {

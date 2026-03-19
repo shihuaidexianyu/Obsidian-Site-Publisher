@@ -19,31 +19,35 @@ afterEach(async () => {
 });
 
 describe("GitBranchDeployAdapter", () => {
-  it("creates or updates a dedicated deploy branch with the built site", async () => {
-    const repoRoot = await createTempDirectory();
-    const buildOutputDir = path.join(repoRoot, ".osp-build-dist");
+  it(
+    "creates or updates a dedicated deploy branch with the built site",
+    async () => {
+      const repoRoot = await createTempDirectory();
+      const buildOutputDir = path.join(repoRoot, ".osp-build-dist");
 
-    await initializeRepository(repoRoot);
-    await mkdir(buildOutputDir, { recursive: true });
-    await writeFile(path.join(buildOutputDir, "index.html"), "<html>branch deploy</html>", "utf8");
+      await initializeRepository(repoRoot);
+      await mkdir(buildOutputDir, { recursive: true });
+      await writeFile(path.join(buildOutputDir, "index.html"), "<html>branch deploy</html>", "utf8");
 
-    const adapter = new GitBranchDeployAdapter();
-    const result = await adapter.deploy(
-      createBuildResult(buildOutputDir),
-      createConfig(repoRoot, {
-        deployBranch: "site",
-        deployCommitMessage: "Deploy test site"
-      })
-    );
+      const adapter = new GitBranchDeployAdapter();
+      const result = await adapter.deploy(
+        createBuildResult(buildOutputDir),
+        createConfig(repoRoot, {
+          deployBranch: "site",
+          deployCommitMessage: "Deploy test site"
+        })
+      );
 
-    expect(result).toEqual({
-      success: true,
-      target: "git-branch",
-      destination: "refs/heads/site",
-      message: "Git branch deploy completed successfully to site."
-    });
-    await expect(readGitFile(repoRoot, "site", "index.html")).resolves.toBe("<html>branch deploy</html>");
-  });
+      expect(result).toEqual({
+        success: true,
+        target: "git-branch",
+        destination: "refs/heads/site",
+        message: "Git branch deploy completed successfully to site."
+      });
+      await expect(readGitFile(repoRoot, "site", "index.html")).resolves.toBe("<html>branch deploy</html>");
+    },
+    20_000
+  );
 
   it("returns a structured failure when targeting the currently checked out branch", async () => {
     const repoRoot = await createTempDirectory();

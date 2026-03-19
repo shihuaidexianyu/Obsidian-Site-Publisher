@@ -43,7 +43,7 @@ describe("runCli integration", () => {
       expect(payload.manifest?.notes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            sourcePath: "index.md"
+            path: "index.md"
           })
         ])
       );
