@@ -63,14 +63,7 @@ export class PluginCommandController {
   }
 
   private async syncViews(result: PluginCommandResult): Promise<void> {
-    if (result.command === "issues") {
-      await this.host.revealIssueListView();
-    }
-
-    if (result.command === "build" || result.command === "publish") {
-      await this.host.revealIssueListView();
-    }
-
+    void result;
     this.host.refreshViews();
   }
 }

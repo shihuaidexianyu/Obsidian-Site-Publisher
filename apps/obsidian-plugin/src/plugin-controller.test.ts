@@ -51,7 +51,7 @@ describe("PluginCommandController", () => {
     expect(host.refreshViews).toHaveBeenCalledOnce();
   });
 
-  it("reveals only the issue view for build-oriented commands", async () => {
+  it("refreshes plugin views without auto-revealing side panels", async () => {
     const host = createHost();
     const shell = createShell({
       statusMessage: "站点构建完成。"
@@ -60,7 +60,7 @@ describe("PluginCommandController", () => {
 
     await controller.runCommand("build");
 
-    expect(host.revealIssueListView).toHaveBeenCalledOnce();
+    expect(host.revealIssueListView).not.toHaveBeenCalled();
     expect(host.revealBuildLogView).not.toHaveBeenCalled();
     expect(host.refreshViews).toHaveBeenCalledOnce();
   });
