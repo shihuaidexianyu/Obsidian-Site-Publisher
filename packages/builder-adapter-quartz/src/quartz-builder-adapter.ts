@@ -21,6 +21,7 @@ import {
 import { ensureQuartzWorkspaceRuntime, readQuartzVersion } from "./quartz-runtime.js";
 
 type QuartzBuilderAdapterOptions = {
+  nodeExecutablePath?: string;
   previewPort?: number;
   previewReadinessTimeoutMs?: number;
   previewWsPort?: number;
@@ -54,6 +55,7 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
         args: this.createBuildArgs(workspace),
         bootstrapCliPath: this.getBootstrapCliPath(workspace),
         cwd: workspace.rootDir,
+        nodeExecutablePath: this.getNodeExecutablePath(),
         quartzPackageRoot
       });
 
@@ -90,6 +92,7 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
         bootstrapCliPath: this.getBootstrapCliPath(workspace),
         cwd: workspace.rootDir,
         logs,
+        nodeExecutablePath: this.getNodeExecutablePath(),
         quartzPackageRoot,
         workspace
       });
@@ -121,7 +124,7 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
 
     const wsPort = this.options.previewWsPort ?? defaultPreviewWsPort;
     const child = spawn(
-      process.execPath,
+      this.getNodeExecutablePath(),
       [this.getBootstrapCliPath(workspace), ...this.createPreviewArgs(workspace, port, wsPort)],
       {
         cwd: workspace.rootDir,
@@ -212,6 +215,10 @@ export class QuartzBuilderAdapter implements BuilderAdapter {
     this.quartzPackageRoot = this.options.quartzPackageRoot ?? resolveQuartzPackageRoot();
     return this.quartzPackageRoot;
   }
+
+  private getNodeExecutablePath(): string {
+    return this.options.nodeExecutablePath ?? process.execPath;
+  }
 }
 
 function resolveQuartzPackageRoot(): string {
@@ -251,6 +258,7 @@ async function runQuartzCommand(input: {
   args: string[];
   bootstrapCliPath: string;
   cwd: string;
+  nodeExecutablePath?: string;
   quartzPackageRoot: string;
 }): Promise<{ exitCode: number; logs: BuildLogEntry[] }> {
   const logs: BuildLogEntry[] = [
@@ -260,7 +268,7 @@ async function runQuartzCommand(input: {
       timestamp: new Date().toISOString()
     }
   ];
-  const child = spawn(process.execPath, [input.bootstrapCliPath, ...input.args], {
+  const child = spawn(input.nodeExecutablePath ?? process.execPath, [input.bootstrapCliPath, ...input.args], {
     cwd: input.cwd,
     env: createQuartzChildProcessEnv(),
     stdio: ["ignore", "pipe", "pipe"],
@@ -280,6 +288,7 @@ async function ensurePreviewBuildReady(input: {
   bootstrapCliPath: string;
   cwd: string;
   logs: BuildLogEntry[];
+  nodeExecutablePath?: string;
   quartzPackageRoot: string;
   workspace: PreparedWorkspace;
 }): Promise<void> {
@@ -293,6 +302,7 @@ async function ensurePreviewBuildReady(input: {
     ],
     bootstrapCliPath: input.bootstrapCliPath,
     cwd: input.cwd,
+    ...(input.nodeExecutablePath === undefined ? {} : { nodeExecutablePath: input.nodeExecutablePath }),
     quartzPackageRoot: input.quartzPackageRoot
   });
 

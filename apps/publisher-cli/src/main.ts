@@ -6,6 +6,7 @@ import type { BuildIssue, BuildLogEntry, BuildResult, CliJsonResult, DeployResul
 
 import { createCliLogger, type CliLogger } from "./cli-logging.js";
 import { parseCliArguments, resolveCliConfig, supportedCommands } from "./config.js";
+import { resolveBundledNodeExecutablePath, waitForTerminationSignal } from "./cli-runtime-support.js";
 
 type CliOutput = {
   log(message: string): void;
@@ -22,7 +23,12 @@ type CliSession = {
 export type CliRuntime = {
   cwd?: string;
   output?: CliOutput;
-  createRuntime?: (options: { quartzPackageRoot?: string; preferStaticPreview: boolean; previewPort?: number }) => CliSession;
+  createRuntime?: (options: {
+    nodeExecutablePath?: string;
+    quartzPackageRoot?: string;
+    preferStaticPreview: boolean;
+    previewPort?: number;
+  }) => CliSession;
   waitForPreviewShutdown?: () => Promise<void>;
 };
 
@@ -53,7 +59,9 @@ export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<
 
   try {
     const resolvedConfig = await resolveCliConfig(parsedArguments.options, cwd);
+    const bundledNodeExecutablePath = resolveBundledNodeExecutablePath();
     const builderOptions = {
+      ...(bundledNodeExecutablePath === undefined ? {} : { nodeExecutablePath: bundledNodeExecutablePath }),
       ...(parsedArguments.options.quartzPackageRoot === undefined
         ? {}
         : { quartzPackageRoot: path.resolve(cwd, parsedArguments.options.quartzPackageRoot) }),
@@ -75,6 +83,7 @@ export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<
 
     cliRuntime =
       runtime.createRuntime?.({
+        ...(builderOptions.nodeExecutablePath === undefined ? {} : { nodeExecutablePath: builderOptions.nodeExecutablePath }),
         ...(builderOptions.quartzPackageRoot === undefined ? {} : { quartzPackageRoot: builderOptions.quartzPackageRoot }),
         ...(builderOptions.previewPort === undefined ? {} : { previewPort: builderOptions.previewPort }),
         preferStaticPreview: parsedArguments.options.preferStaticPreview
@@ -326,19 +335,6 @@ function formatError(error: unknown): string {
   }
 
   return "CLI command failed with an unknown error.";
-}
-
-function waitForTerminationSignal(): Promise<void> {
-  return new Promise((resolve) => {
-    const onSignal = (): void => {
-      process.off("SIGINT", onSignal);
-      process.off("SIGTERM", onSignal);
-      resolve();
-    };
-
-    process.once("SIGINT", onSignal);
-    process.once("SIGTERM", onSignal);
-  });
 }
 
 function printJson(reporter: CliReporter, payload: CliJsonResult): void {

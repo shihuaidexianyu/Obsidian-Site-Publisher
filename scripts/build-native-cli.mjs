@@ -53,7 +53,7 @@ function createLauncherSource() {
     "",
     "(async () => {",
     "  const executableDirectory = path.dirname(process.execPath);",
-    "  const cliEntrypoint = path.join(executableDirectory, 'runtime', 'app', 'dist', 'main.js');",
+    "  const cliEntrypoint = path.join(executableDirectory, 'runtime', 'app', 'dist', 'src', 'main.js');",
     "  const moduleUrl = pathToFileURL(cliEntrypoint).href;",
     "  const { runCli } = await import(moduleUrl);",
     "  process.exitCode = await runCli(process.argv.slice(2), {",

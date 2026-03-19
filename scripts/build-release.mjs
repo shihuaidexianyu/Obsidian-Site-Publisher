@@ -59,9 +59,11 @@ const nativeCli = await buildNativeCli({
 });
 
 const pluginPackageRoot = path.join(stagingRoot, pluginManifest.id);
+const bundledNodeExecutableName = process.platform === "win32" ? "node.exe" : "node";
 await cp(pluginBundleRoot, pluginPackageRoot, { recursive: true });
 await mkdir(path.join(pluginPackageRoot, "bin"), { recursive: true });
 await cp(nativeCli.outputExecutablePath, path.join(pluginPackageRoot, "bin", path.basename(nativeCli.outputExecutablePath)), { force: true });
+await cp(process.execPath, path.join(pluginPackageRoot, "bin", bundledNodeExecutableName), { force: true });
 await cp(cliPackageRoot, path.join(pluginPackageRoot, "bin", "runtime", "app"), { recursive: true, dereference: true });
 
 const pluginArchiveName = `obsidian-site-publisher-${platformLabel}-${version}.zip`;

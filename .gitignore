@@ -12,3 +12,4 @@ coverage/
 .obsidian-plugin-build/
 .release/
 .tmp-*/
+.tmp-*
