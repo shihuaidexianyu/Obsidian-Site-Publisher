@@ -20,7 +20,7 @@ These rules are designed to keep vibe coding productive without letting the repo
 - A focused implementation inside one package
 - Tests plus implementation for one diagnosis rule
 - Adapter wiring inside a single adapter package
-- UI wiring that only consumes `@osp/core`
+- UI wiring that keeps the Obsidian plugin as a thin shell around external CLI calls
 
 ## Disallowed Edit Shapes
 
@@ -28,6 +28,7 @@ These rules are designed to keep vibe coding productive without letting the repo
 - Changing public interfaces without updating docs and dependents
 - Adding hidden side effects to shared utilities
 - Mixing refactors with new features across multiple layers
+- Moving parser, diagnostics, Quartz, or deploy business logic back into the Obsidian plugin
 
 ## Required Checks
 
