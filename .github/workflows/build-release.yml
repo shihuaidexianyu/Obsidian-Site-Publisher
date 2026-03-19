@@ -47,6 +47,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ runner.os }}-${{ runner.arch }}
+          if-no-files-found: error
+          include-hidden-files: true
           path: .release/v*/artifacts/*
 
   publish-release:
