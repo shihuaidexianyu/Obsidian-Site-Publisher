@@ -1,288 +1,312 @@
 # Obsidian Site Publisher
 
-Obsidian Site Publisher 用于将 Obsidian vault 中的一部分官方语法笔记发布为静态网站。
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-当前架构如下：
+Publish a selected subset of an Obsidian vault as a static site.
 
-- `publisher-cli` 是独立程序，负责 `scan / build / preview / deploy`
-- Obsidian 插件负责设置、命令、进度提示、问题展示和调用外部 CLI
-- Quartz 是默认静态站点构建器
+Obsidian Site Publisher is built around three layers:
 
-## 功能概览
+- an Obsidian plugin for settings and commands
+- a standalone `publisher-cli` for scan/build/preview/deploy
+- a Quartz-based build pipeline behind `@osp/core`
 
-当前版本支持：
+## Features
 
-- 扫描真实 vault，识别笔记、资源、`.canvas`、`.base`
-- 诊断常见问题，例如 broken links、missing assets、duplicate slug
-- 根据 `frontmatter / folder / publishRoot / includeGlobs / excludeGlobs` 选择发布范围
-- 生成 staging workspace 并构建 Quartz 站点
-- 在 Obsidian 中执行“检查问题 / 构建 / 预览 / 发布”
-- 发布到本地目录、Git 分支或 GitHub Pages 仓库
+- Scan real Obsidian vaults and build a normalized manifest
+- Diagnose common publishing problems before build
+- Select a public slice with `frontmatter`, `folder`, `publishRoot`, `includeGlobs`, and `excludeGlobs`
+- Stage only the required notes and assets for Quartz
+- Build and preview static sites with Quartz
+- Deploy to local export, Git branch, or GitHub Pages
+- Trigger the workflow from Obsidian without running the build inside the renderer process
 
-## 支持范围
+## Status
 
-第一版仅面向 Obsidian 官方能力。
+This repository is usable for a first public preview of the workflow.
 
-支持：
+Supported in v1:
 
-- Markdown 笔记
-- Frontmatter / Properties
-- 官方 wikilink / markdown link / embeds
-- 官方附件目录规则
-- 官方 `.canvas` / `.base` 的识别和报告
+- Markdown notes
+- frontmatter / Properties
+- Obsidian wikilinks, markdown links, embeds, headings, and block references
+- official attachment folder behavior
+- official `.canvas` / `.base` detection and reporting
 
-暂不支持：
+Out of scope in v1:
 
 - Dataview
 - Templater
 - Excalidraw
-- 其他社区插件语法
-- 网页端反向编辑 Obsidian 笔记
+- community plugin syntax compatibility
+- web-to-vault round-trip editing
 
-## 安装
+## Architecture
 
-推荐将项目发布为两类安装包：
+The project keeps a strict orchestration boundary:
 
-- 当前平台的一体化插件包：包含插件文件和原生 CLI，可直接安装到 vault
-- 开发源码安装：用于开发、调试或自定义构建
+1. `@osp/parser` scans vault content into a manifest
+2. `@osp/diagnostics` produces structured issues
+3. `@osp/staging` prepares a Quartz-ready workspace
+4. `@osp/builder-adapter-quartz` builds or previews the site
+5. `@osp/deploy-adapters` publishes a successful build
+6. `@osp/core` orchestrates the full pipeline
+7. `apps/publisher-cli` exposes the pipeline as a standalone program
+8. `apps/obsidian-plugin` remains a thin UI shell around the external CLI
 
-最终用户建议直接从发行包安装；开发者可以从源码构建。当前的 `build:release` 会为**当前操作系统和架构**生成对应的一体化插件包。多平台发行建议通过 CI 矩阵分别构建。
+More details:
 
-### 从发行包安装
+- [Architecture Index](docs/architecture/README.md)
+- [System Overview](docs/architecture/system-overview.md)
+- [Module Boundaries](docs/architecture/module-boundaries.md)
+- [ADR](docs/adr)
 
-发行物由以下命令生成：
+## Requirements
 
-```bash
-corepack pnpm build:release
-```
+### End users
 
-生成目录：
+Using a release package:
 
-```text
-.release/v<version>/artifacts/
-```
+- Obsidian desktop
+- a local vault on the desktop filesystem
+- Git, only if you want Git-based deploy targets
 
-其中包含：
+End users do not need to install Node.js when using the packaged release.
 
-- `obsidian-site-publisher-<platform>-<arch>-<version>.zip`
+### Developers
 
-安装步骤：
+Building from source:
 
-1. 解压插件包，并将整个 `obsidian-site-publisher/` 目录复制到：
-
-```text
-<你的Vault>/.obsidian/plugins/obsidian-site-publisher/
-```
-
-2. 在 Obsidian 中启用 `站点发布`
-3. 默认情况下，插件会自动优先使用同目录下 `bin/` 中的原生 CLI，无需手动配置 `CLI 可执行文件路径`
-
-说明：
-
-- 该发行包已经包含平台对应的原生 CLI
-- 用户机器上不需要额外安装 Node.js
-- 如果确实需要覆盖为其他 CLI 路径，仍然可以在插件设置里手动指定
-
-### 从源码安装
-
-### 环境要求
-
-- Obsidian
 - Node.js 20+
 - `corepack`
+- `pnpm`
 - Git
 
-### 1. 安装依赖
+## Installation
 
-在仓库根目录执行：
+There are two supported ways to install the project.
+
+### Option A: Install from a release package
+
+Recommended for normal users.
+
+The release workflow produces a platform-specific plugin package that includes:
+
+- the Obsidian plugin files
+- a packaged native CLI
+- the runtime files required by the CLI
+
+Expected layout after extracting the archive:
+
+```text
+obsidian-site-publisher/
+  main.js
+  manifest.json
+  versions.json
+  bin/
+    publisher-cli(.exe)
+    runtime/
+```
+
+Installation steps:
+
+1. Download the package for your platform from Releases.
+2. Extract it.
+3. Copy the whole `obsidian-site-publisher/` directory into:
+
+```text
+<Vault>/.obsidian/plugins/
+```
+
+4. Open Obsidian and enable the plugin.
+
+By default, the plugin will look for the bundled CLI in `bin/`, so no extra CLI path configuration is usually required.
+
+### Option B: Build from source
+
+Recommended for development and debugging.
+
+1. Install dependencies:
 
 ```bash
 corepack pnpm install
 ```
 
-### 2. 构建 CLI
+2. Build the workspace:
 
 ```bash
 corepack pnpm build
 ```
 
-构建完成后，CLI 入口位于：
-
-- `apps/publisher-cli/dist/main.js`
-
-包中声明的命令名为 `publisher-cli`。
-
-### 3. 构建 Obsidian 插件
+3. Build the Obsidian plugin bundle:
 
 ```bash
 corepack pnpm build:obsidian-plugin
 ```
 
-插件产物将生成到：
-
-- `.obsidian-plugin-build/obsidian-site-publisher/`
-
-其中包含：
-
-- `main.js`
-- `manifest.json`
-- `versions.json`
-
-### 4. 安装到 Obsidian
-
-将上述 3 个文件复制到以下目录：
+4. Copy the generated files from:
 
 ```text
-<你的Vault>/.obsidian/plugins/obsidian-site-publisher/
+.obsidian-plugin-build/obsidian-site-publisher/
 ```
 
-然后在 Obsidian 中：
-
-1. 打开 `设置 -> 社区插件`
-2. 启用社区插件
-3. 启用 `站点发布`
-
-### 5. 配置外部 CLI
-
-启用插件后，在插件设置页中填写：
-
-- `CLI 可执行文件路径`
-
-Windows 常见示例：
+into:
 
 ```text
-C:\Users\<你的用户名>\path\to\Obsidian Site Publisher\apps\publisher-cli\dist\main.js
+<Vault>/.obsidian/plugins/obsidian-site-publisher/
 ```
 
-如果你使用的是 `build:release` 生成的一体化插件包，这一步通常不需要手动填写。
+5. In the plugin settings, set `CLI executable path` to:
 
-## 使用方式
+```text
+<repo>/apps/publisher-cli/dist/main.js
+```
 
-插件启用并配置完成后，可以在 Obsidian 命令面板中使用：
+## Usage
 
-- `站点发布：检查问题`
-- `站点发布：构建`
-- `站点发布：启动预览`
-- `站点发布：发布`
+### From the Obsidian plugin
 
-插件设置页支持以下配置：
+Available commands:
 
-- 发布模式
-- 发布根目录
-- 只包含这些路径
-- 排除这些路径
-- 输出目录
-- 预览端口
-- 部署目标
-- 部署仓库地址
-- 部署分支
-- 提交信息
+- `Site Publisher: Check Issues`
+- `Site Publisher: Build Site`
+- `Site Publisher: Start Preview`
+- `Site Publisher: Publish Site`
 
-常见用法：
+Typical workflow:
 
-- 使用 `Folder` 模式发布某个目录
-- 使用“只包含这些路径”精确纳入需要展示的文件夹
-- 使用“排除这些路径”隐藏日记、草稿或私有目录
+1. Choose a publish mode
+2. Narrow the public slice with `publishRoot`, `includeGlobs`, and `excludeGlobs`
+3. Run `Check Issues`
+4. Run `Build Site` or `Start Preview`
+5. Run `Publish Site`
 
-## 输出与日志
+### From the CLI
 
-默认情况下：
+Common commands:
 
-- 构建/预览工作目录位于 `<vault>/.osp/`
-- CLI 日志位于 `<vault>/.osp/logs/`
-- 构建产物通常位于 `<vault>/.osp/build/dist/`
+```bash
+publisher-cli scan --vault-root /path/to/vault
+publisher-cli build --vault-root /path/to/vault
+publisher-cli preview --vault-root /path/to/vault
+publisher-cli deploy --vault-root /path/to/vault
+```
 
-插件侧边栏仅显示轻量摘要，完整构建日志请查看 `.osp/logs`。
+You can also pass a config file:
 
-## 多平台发布
+```bash
+publisher-cli build --config ./publisher.config.json
+```
 
-仓库中已经包含跨平台构建工作流：
+Useful flags:
 
-- [`.github/workflows/build-release.yml`](.github/workflows/build-release.yml)
+- `--json`
+- `--log-dir`
+- `--preview-port`
+- `--quartz-package-root`
 
-该工作流会在 Windows、macOS 和 Linux 上分别执行 `corepack pnpm build:release`，从而得到各自平台的一体化安装包。
+## Configuration
 
-## 常见问题
+Main config fields:
 
-### 插件里只看到“检查问题”，看不到构建或发布
+- `publishMode`
+- `publishRoot`
+- `includeGlobs`
+- `excludeGlobs`
+- `outputDir`
+- `deployTarget`
+- `deployOutputDir`
+- `deployRepositoryUrl`
+- `deployBranch`
+- `deployCommitMessage`
+- `strictMode`
 
-通常表示 Obsidian 仍在加载旧版插件文件。请重新覆盖：
-
-- `main.js`
-- `manifest.json`
-- `versions.json`
-
-然后完全重启 Obsidian。
-
-### 构建时报 `EMPTY_PUBLISH_SLICE`
-
-表示当前配置没有选中任何笔记。建议检查：
-
-- 发布模式是否正确
-- `publishRoot` 是否过窄
-- `includeGlobs / excludeGlobs` 是否排除了全部内容
-- `frontmatter` 模式下是否至少有一篇笔记包含 `publish: true`
-
-### Obsidian 中正常显示，但网页中的数学公式报错
-
-项目会在 staging 阶段做一小部分数学兼容归一化，例如：
-
-- `($$ ... $$)` -> `$...$`
-- `\(...\)` -> `$...$`
-- `\[...\]` -> `$$ ... $$`
-
-如果公式中直接混用中文、标题或粗体等 Markdown 语法，Quartz/KaTeX 仍可能给出告警。
-
-## 部署配置示例
-
-本地导出：
+Example:
 
 ```json
 {
-  "deployTarget": "local-export",
-  "deployOutputDir": "./published-site"
-}
-```
-
-Git 分支部署：
-
-```json
-{
-  "deployTarget": "git-branch",
-  "deployBranch": "gh-pages",
-  "deployCommitMessage": "Deploy static site"
-}
-```
-
-GitHub Pages：
-
-```json
-{
+  "vaultRoot": "./my-vault",
+  "publishMode": "folder",
+  "publishRoot": "Public",
+  "includeGlobs": ["Notes/**"],
+  "excludeGlobs": ["Diary/**", "**/.obsidian/**", "**/.osp/**"],
+  "outputDir": "./my-vault/.osp/dist",
+  "builder": "quartz",
   "deployTarget": "github-pages",
-  "deployRepositoryUrl": "https://github.com/<user>/<user>.github.io",
+  "deployRepositoryUrl": "https://github.com/example/example.github.io",
   "deployBranch": "main",
-  "deployCommitMessage": "Deploy static site"
+  "deployCommitMessage": "Deploy static site",
+  "enableSearch": true,
+  "enableBacklinks": true,
+  "enableGraph": true,
+  "strictMode": false
 }
 ```
 
-## 仓库结构
+## Logging and Output
 
-- `apps/obsidian-plugin`：Obsidian 插件
-- `apps/publisher-cli`：独立 CLI
-- `packages/*`：核心能力、适配器和共享类型
-- `fixtures/*`：回归测试样例
-- `docs/adr`：架构决策记录
-- `docs/prompts`：工程规则和协作约束
+Default vault-local locations:
 
-## 开发说明
+- workspace and preview files: `<vault>/.osp/`
+- CLI logs: `<vault>/.osp/logs/`
+- build output: `<vault>/.osp/build/dist/`
 
-相关文档：
+The plugin shows only lightweight summaries. Full logs are written to the CLI log files.
 
-- [工程规则](docs/prompts/engineering-rules.md)
-- [任务模板](docs/prompts/task-template.md)
-- [插件说明](apps/obsidian-plugin/README.md)
-- [路线图](todo.md)
+## Development
 
-真实 smoke-test vault：
+Useful commands:
 
-- `test_vault/hw`
+```bash
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm build
+corepack pnpm check
+corepack pnpm build:obsidian-plugin
+corepack pnpm build:release
+```
+
+Fixtures and smoke inputs:
+
+- deterministic fixtures: [`fixtures/`](fixtures/)
+- real-world smoke vault: `test_vault/hw`
+
+## Repository Layout
+
+```text
+apps/
+  obsidian-plugin/
+  publisher-cli/
+packages/
+  builder-adapter-quartz/
+  core/
+  deploy-adapters/
+  diagnostics/
+  parser/
+  shared/
+  staging/
+docs/
+  adr/
+  architecture/
+  prompts/
+fixtures/
+test_vault/
+```
+
+## Documentation
+
+- [简体中文 README](README.zh-CN.md)
+- [Plugin README](apps/obsidian-plugin/README.md)
+- [Architecture Index](docs/architecture/README.md)
+- [Engineering Rules](docs/prompts/engineering-rules.md)
+- [Task Template](docs/prompts/task-template.md)
+- [Roadmap](todo.md)
+
+## Known Limitations
+
+- `.canvas` and `.base` are detected and reported, but not rendered in v1
+- some Quartz/KaTeX warnings may remain for math that mixes markdown-like syntax inside formulas
+- community plugin syntax is intentionally unsupported
+
+## License
+
+This repository does not currently declare a separate license file.
