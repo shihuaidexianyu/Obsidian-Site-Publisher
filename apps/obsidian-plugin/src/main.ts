@@ -35,9 +35,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
       showInformationalIssues: false
     }
   };
-  private statusBarEl?: HTMLElement;
   private controller?: PluginCommandController;
-  private stopProgressIndicator: (() => void) | undefined;
 
   public override async onload(): Promise<void> {
     const vaultRoot = resolveVaultRoot(this);
@@ -48,7 +46,6 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
 
     this.settings = loadedSettings;
     this.registerWorkspaceViews();
-    this.statusBarEl = this.addStatusBarItem();
     this.controller = new PluginCommandController(
       this.shell,
       {
@@ -59,8 +56,8 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
             callback: async () => callback()
           });
         },
-        setStatus: (message) => this.statusBarEl?.setText(message),
-        beginProgress: (command) => this.beginProgressIndicator(command),
+        setStatus: () => {},
+        beginProgress: () => () => {},
         showNotice: (message) => {
           new Notice(message);
         },
@@ -72,7 +69,6 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
     );
 
     this.controller.registerCommands();
-    this.statusBarEl.setText("站点发布插件已就绪");
     this.addRibbonIcon(CONTROL_PANEL_VIEW_ICON, "打开站点发布面板", () => {
       void this.revealPluginView(CONTROL_PANEL_VIEW_TYPE);
     });
@@ -80,7 +76,6 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   }
 
   public override onunload(): void {
-    this.stopProgressIndicator?.();
     void this.shell.dispose();
     this.app.workspace.detachLeavesOfType(CONTROL_PANEL_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(ISSUE_LIST_VIEW_TYPE);
@@ -90,7 +85,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   public async updateSettings(nextSettings: PublisherPluginSettings): Promise<void> {
     this.settings = nextSettings;
     await savePluginSettings(this, this.settings);
-    this.statusBarEl?.setText("站点发布设置已保存");
+    this.refreshPluginViews();
   }
 
   public getSettings(): PublisherPluginSettings {
@@ -160,31 +155,6 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   private getOrCreateViewLeaf(viewType: string): WorkspaceLeaf {
     return this.app.workspace.getLeavesOfType(viewType)[0] ?? this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true);
   }
-
-  private beginProgressIndicator(command: "preview" | "build" | "publish" | "issues"): () => void {
-    this.stopProgressIndicator?.();
-
-    const baseLabel = createRunningStatusLabel(command);
-    const frames = ["[      ]", "[=     ]", "[==    ]", "[===   ]", "[ ===  ]", "[  === ]", "[   ===]", "[    ==]", "[     =]"];
-    let frameIndex = 0;
-    const render = (): void => {
-      this.statusBarEl?.setText(`站点发布：${baseLabel} ${frames[frameIndex] ?? frames[0]}`);
-      frameIndex = (frameIndex + 1) % frames.length;
-    };
-
-    render();
-    const intervalId = globalThis.setInterval(render, 180);
-    const stop = (): void => {
-      globalThis.clearInterval(intervalId);
-
-      if (this.stopProgressIndicator === stop) {
-        this.stopProgressIndicator = undefined;
-      }
-    };
-
-    this.stopProgressIndicator = stop;
-    return stop;
-  }
 }
 
 function resolveVaultRoot(plugin: Plugin): string {
@@ -197,17 +167,4 @@ function resolveVaultRoot(plugin: Plugin): string {
 
 function resolvePluginRoot(plugin: Plugin, vaultRoot: string): string {
   return path.join(vaultRoot, plugin.app.vault.configDir, "plugins", pluginManifest.id);
-}
-
-function createRunningStatusLabel(command: "preview" | "build" | "publish" | "issues"): string {
-  switch (command) {
-    case "preview":
-      return "正在启动预览";
-    case "build":
-      return "正在构建";
-    case "publish":
-      return "正在发布";
-    case "issues":
-      return "正在检查问题";
-  }
 }

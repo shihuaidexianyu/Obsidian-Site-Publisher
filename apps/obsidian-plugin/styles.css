@@ -80,6 +80,28 @@
   line-height: 1.45;
 }
 
+.osp-progress-bar {
+  overflow: hidden;
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-modifier-border) 62%, transparent);
+}
+
+.osp-progress-bar-fill {
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--interactive-accent) 70%, #ffffff 8%), var(--interactive-accent));
+  animation: osp-progress-slide 1.2s ease-in-out infinite;
+}
+
+.osp-progress-text {
+  color: var(--osp-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .osp-section {
   display: flex;
   flex-direction: column;
@@ -170,6 +192,29 @@
   word-break: break-word;
 }
 
+.osp-meta-value-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.osp-meta-value-code {
+  flex: 1;
+  user-select: text;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.osp-meta-copy-button {
+  flex-shrink: 0;
+  min-width: 48px;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .osp-panel-item {
   display: flex;
   flex-direction: column;
@@ -215,4 +260,18 @@
   padding: 12px;
   line-height: 1.5;
   background: color-mix(in srgb, var(--background-primary-alt) 22%, transparent);
+}
+
+@keyframes osp-progress-slide {
+  0% {
+    transform: translateX(-90%);
+  }
+
+  50% {
+    transform: translateX(135%);
+  }
+
+  100% {
+    transform: translateX(-90%);
+  }
 }

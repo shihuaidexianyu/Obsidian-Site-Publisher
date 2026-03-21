@@ -130,8 +130,9 @@ describe("plugin view model", () => {
 
     expect(createControlPanelMeta(state, "build")).toEqual({
       title: "站点发布",
-      summary: "正在执行：构建。面板会在任务完成后自动刷新。",
-      statusMessage: "站点预览已启动：http://localhost:8080"
+      summary: "正在执行：构建。进度会显示在这里。",
+      statusMessage: "正在构建站点...",
+      progressMessage: "任务进行中，请稍候..."
     });
     expect(createControlPanelActions("build")).toEqual([
       {
@@ -182,7 +183,8 @@ describe("plugin view model", () => {
       },
       {
         label: "日志文件",
-        value: "D:/vault/.osp/logs/preview.log"
+        value: "D:/vault/.osp/logs/preview.log",
+        copyValue: "D:/vault/.osp/logs/preview.log"
       },
       {
         label: "最近更新",

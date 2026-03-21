@@ -26,6 +26,7 @@ export type ControlPanelMeta = {
   title: string;
   summary: string;
   statusMessage: string;
+  progressMessage?: string;
 };
 
 export type ControlPanelAction = {
@@ -40,6 +41,7 @@ export type ControlPanelAction = {
 export type ControlPanelStatusItem = {
   label: string;
   value: string;
+  copyValue?: string;
 };
 
 const maxVisibleLogEntries = 40;
@@ -97,14 +99,18 @@ export function createControlPanelMeta(
   state: PluginExecutionState,
   activeCommand: PluginCommand | undefined
 ): ControlPanelMeta {
-  const summary =
-    activeCommand === undefined
-      ? "可在这里直接执行检查、构建、预览和发布操作。"
-      : `正在执行：${formatCommand(activeCommand)}。面板会在任务完成后自动刷新。`;
+  if (activeCommand !== undefined) {
+    return {
+      title: "站点发布",
+      summary: `正在执行：${formatCommand(activeCommand)}。进度会显示在这里。`,
+      statusMessage: createRunningStatusMessage(activeCommand),
+      progressMessage: "任务进行中，请稍候..."
+    };
+  }
 
   return {
     title: "站点发布",
-    summary,
+    summary: "可在这里直接执行检查、构建、预览和发布操作。",
     statusMessage: state.statusMessage ?? "尚未执行任何操作。"
   };
 }
@@ -147,7 +153,8 @@ export function createControlPanelStatusItems(
   if (state.lastLogPath !== undefined) {
     items.push({
       label: "日志文件",
-      value: state.lastLogPath
+      value: state.lastLogPath,
+      copyValue: state.lastLogPath
     });
   }
 
@@ -226,4 +233,17 @@ function createControlPanelAction(
     isRunning,
     isDisabled: activeCommand !== undefined
   };
+}
+
+function createRunningStatusMessage(command: PluginCommand): string {
+  switch (command) {
+    case "issues":
+      return "正在检查发布问题...";
+    case "build":
+      return "正在构建站点...";
+    case "preview":
+      return "正在启动预览服务...";
+    case "publish":
+      return "正在发布站点...";
+  }
 }

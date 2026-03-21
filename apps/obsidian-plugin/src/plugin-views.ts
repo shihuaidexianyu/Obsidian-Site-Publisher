@@ -1,4 +1,4 @@
-import { ItemView, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 
 import {
   createControlPanelActions,
@@ -156,6 +156,17 @@ function renderControlPanel(
     cls: "osp-status-card-message",
     text: meta.statusMessage
   });
+  if (meta.progressMessage !== undefined) {
+    statusCardEl.createDiv({
+      cls: "osp-progress-bar"
+    }).createDiv({
+      cls: "osp-progress-bar-fill"
+    });
+    statusCardEl.createEl("div", {
+      cls: "osp-progress-text",
+      text: meta.progressMessage
+    });
+  }
 
   const actionsSectionEl = containerEl.createDiv({
     cls: "osp-section"
@@ -189,9 +200,28 @@ function renderControlPanel(
       cls: "osp-meta-label",
       text: item.label
     });
-    itemEl.createEl("div", {
-      cls: "osp-meta-value",
+
+    if (item.copyValue === undefined) {
+      itemEl.createEl("div", {
+        cls: "osp-meta-value",
+        text: item.value
+      });
+      continue;
+    }
+
+    const valueRowEl = itemEl.createDiv({
+      cls: "osp-meta-value-row"
+    });
+    valueRowEl.createEl("div", {
+      cls: "osp-meta-value osp-meta-value-code",
       text: item.value
+    });
+    const copyButtonEl = valueRowEl.createEl("button", {
+      cls: "osp-meta-copy-button",
+      text: "复制"
+    });
+    copyButtonEl.addEventListener("click", () => {
+      void copyTextToClipboard(item.copyValue as string);
     });
   }
 
@@ -224,6 +254,25 @@ function renderControlPanel(
       text: item.message
     });
   });
+}
+
+async function copyTextToClipboard(value: string): Promise<void> {
+  try {
+    const clipboardApi = (globalThis.navigator as Navigator & {
+      clipboard?: {
+        writeText(text: string): Promise<void>;
+      };
+    }).clipboard;
+
+    if (clipboardApi === undefined) {
+      throw new Error("Clipboard API unavailable");
+    }
+
+    await clipboardApi.writeText(value);
+    new Notice("日志文件地址已复制");
+  } catch {
+    new Notice("复制失败，请重试。");
+  }
 }
 
 function renderIssuePanel(containerEl: HTMLElement, state: PluginExecutionState, ui: PublisherPluginUiSettings): void {
