@@ -34,6 +34,10 @@ export class PluginCommandController {
     }
   }
 
+  public getActiveCommand(): PluginCommand | undefined {
+    return this.activeCommand;
+  }
+
   public async runCommand(command: PluginCommand): Promise<void> {
     if (this.activeCommand !== undefined) {
       this.host.showNotice(`已有任务正在运行：${formatCommandLabel(this.activeCommand)}。请等待当前任务完成。`);
@@ -42,6 +46,7 @@ export class PluginCommandController {
 
     this.activeCommand = command;
     const stopProgress = this.host.beginProgress(command);
+    this.host.refreshViews();
 
     try {
       const result = await this.shell.runCommand(command, this.getConfig());
@@ -49,22 +54,16 @@ export class PluginCommandController {
       stopProgress();
       this.host.setStatus(createStatusBarMessage(result));
       this.host.showNotice(result.statusMessage);
-      await this.syncViews(result);
     } catch (error) {
       const message = formatPluginCommandError(command, error);
 
       stopProgress();
       this.host.setStatus(createErrorStatusBarMessage(command));
       this.host.showNotice(message);
-      this.host.refreshViews();
     } finally {
       this.activeCommand = undefined;
+      this.host.refreshViews();
     }
-  }
-
-  private async syncViews(result: PluginCommandResult): Promise<void> {
-    void result;
-    this.host.refreshViews();
   }
 }
 

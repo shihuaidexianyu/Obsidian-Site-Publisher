@@ -1,6 +1,6 @@
 import type { BuildIssue, BuildLogEntry } from "@osp/shared";
 
-import type { PluginExecutionState } from "./plugin-shell.js";
+import type { PluginCommand, PluginExecutionState } from "./plugin-shell.js";
 import type { PublisherPluginUiSettings } from "./settings.js";
 
 export type PanelMeta = {
@@ -20,6 +20,26 @@ export type LogPanelItem = {
   badge: string;
   timestamp: string;
   message: string;
+};
+
+export type ControlPanelMeta = {
+  title: string;
+  summary: string;
+  statusMessage: string;
+};
+
+export type ControlPanelAction = {
+  command: PluginCommand;
+  label: string;
+  description: string;
+  buttonLabel: string;
+  isRunning: boolean;
+  isDisabled: boolean;
+};
+
+export type ControlPanelStatusItem = {
+  label: string;
+  value: string;
 };
 
 const maxVisibleLogEntries = 40;
@@ -73,6 +93,74 @@ export function createLogPanelItems(state: PluginExecutionState): LogPanelItem[]
   }));
 }
 
+export function createControlPanelMeta(
+  state: PluginExecutionState,
+  activeCommand: PluginCommand | undefined
+): ControlPanelMeta {
+  const summary =
+    activeCommand === undefined
+      ? "可在这里直接执行检查、构建、预览和发布操作。"
+      : `正在执行：${formatCommand(activeCommand)}。面板会在任务完成后自动刷新。`;
+
+  return {
+    title: "站点发布",
+    summary,
+    statusMessage: state.statusMessage ?? "尚未执行任何操作。"
+  };
+}
+
+export function createControlPanelActions(activeCommand: PluginCommand | undefined): ControlPanelAction[] {
+  return [
+    createControlPanelAction("issues", "检查问题", "扫描当前配置下的阻断项和提示。", activeCommand),
+    createControlPanelAction("build", "构建站点", "生成静态站点文件，但不执行发布。", activeCommand),
+    createControlPanelAction("preview", "启动预览", "启动本地预览服务，便于先检查效果。", activeCommand),
+    createControlPanelAction("publish", "发布站点", "按当前发布目标执行构建并发布。", activeCommand)
+  ];
+}
+
+export function createControlPanelStatusItems(
+  state: PluginExecutionState,
+  ui: PublisherPluginUiSettings
+): ControlPanelStatusItem[] {
+  const visibleIssues = filterVisibleIssues(state, ui);
+  const items: ControlPanelStatusItem[] = [
+    {
+      label: "最近问题",
+      value: visibleIssues.length === 0 ? "没有需要处理的问题" : `共 ${visibleIssues.length} 个待关注问题`
+    }
+  ];
+
+  if (state.lastCommand !== undefined) {
+    items.push({
+      label: "最近命令",
+      value: formatCommand(state.lastCommand)
+    });
+  }
+
+  if (state.lastPreviewSession !== undefined) {
+    items.push({
+      label: "预览地址",
+      value: state.lastPreviewSession.url
+    });
+  }
+
+  if (state.lastLogPath !== undefined) {
+    items.push({
+      label: "日志文件",
+      value: state.lastLogPath
+    });
+  }
+
+  if (state.lastUpdatedAt !== undefined) {
+    items.push({
+      label: "最近更新",
+      value: state.lastUpdatedAt
+    });
+  }
+
+  return items;
+}
+
 function filterVisibleIssues(state: PluginExecutionState, ui: PublisherPluginUiSettings): typeof state.lastIssues {
   if (ui.showInformationalIssues) {
     return state.lastIssues;
@@ -120,4 +208,22 @@ function formatCommand(command: PluginExecutionState["lastCommand"]): string {
     default:
       return "未知";
   }
+}
+
+function createControlPanelAction(
+  command: PluginCommand,
+  label: string,
+  description: string,
+  activeCommand: PluginCommand | undefined
+): ControlPanelAction {
+  const isRunning = activeCommand === command;
+
+  return {
+    command,
+    label,
+    description,
+    buttonLabel: isRunning ? `正在${label}...` : label,
+    isRunning,
+    isDisabled: activeCommand !== undefined
+  };
 }

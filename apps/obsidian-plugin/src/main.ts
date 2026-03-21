@@ -5,7 +5,14 @@ import { FileSystemAdapter, Notice, Plugin, type WorkspaceLeaf } from "obsidian"
 import { createExternalCliBackendFactory } from "./external-cli.js";
 import { PluginCommandController } from "./plugin-controller.js";
 import { PublisherPluginSettingTab } from "./plugin-settings-tab.js";
-import { BuildLogView, BUILD_LOG_VIEW_TYPE, IssueListView, ISSUE_LIST_VIEW_TYPE } from "./plugin-views.js";
+import {
+  BuildLogView,
+  BUILD_LOG_VIEW_TYPE,
+  CONTROL_PANEL_VIEW_TYPE,
+  IssueListView,
+  ISSUE_LIST_VIEW_TYPE,
+  PublisherControlView
+} from "./plugin-views.js";
 import { pluginManifest, PublisherPluginShell } from "./plugin-shell.js";
 import { loadPluginSettings, savePluginSettings, type PublisherPluginSettings } from "./settings.js";
 
@@ -65,12 +72,16 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
 
     this.controller.registerCommands();
     this.statusBarEl.setText("站点发布插件已就绪");
+    this.addRibbonIcon("rocket", "打开站点发布面板", () => {
+      void this.revealPluginView(CONTROL_PANEL_VIEW_TYPE);
+    });
     this.addSettingTab(new PublisherPluginSettingTab(this.app, this));
   }
 
   public override onunload(): void {
     this.stopProgressIndicator?.();
     void this.shell.dispose();
+    this.app.workspace.detachLeavesOfType(CONTROL_PANEL_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(ISSUE_LIST_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(BUILD_LOG_VIEW_TYPE);
   }
@@ -94,6 +105,23 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   }
 
   private registerWorkspaceViews(): void {
+    this.registerView(
+      CONTROL_PANEL_VIEW_TYPE,
+      (leaf) =>
+        new PublisherControlView(
+          leaf,
+          () => this.shell.getState(),
+          () => this.settings.ui,
+          () => this.controller?.getActiveCommand(),
+          async (command) => {
+            if (this.controller === undefined) {
+              throw new Error("插件控制器尚未准备就绪。");
+            }
+
+            await this.controller.runCommand(command);
+          }
+        )
+    );
     this.registerView(ISSUE_LIST_VIEW_TYPE, (leaf) => new IssueListView(leaf, () => this.shell.getState(), () => this.settings.ui));
     this.registerView(BUILD_LOG_VIEW_TYPE, (leaf) => new BuildLogView(leaf, () => this.shell.getState()));
   }
@@ -109,6 +137,12 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
   }
 
   private refreshPluginViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(CONTROL_PANEL_VIEW_TYPE)) {
+      if (leaf.view instanceof PublisherControlView) {
+        leaf.view.refresh();
+      }
+    }
+
     for (const leaf of this.app.workspace.getLeavesOfType(ISSUE_LIST_VIEW_TYPE)) {
       if (leaf.view instanceof IssueListView) {
         leaf.view.refresh();

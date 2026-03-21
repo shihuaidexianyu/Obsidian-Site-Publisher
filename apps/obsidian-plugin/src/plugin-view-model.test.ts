@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createControlPanelActions,
+  createControlPanelMeta,
+  createControlPanelStatusItems,
   createIssuePanelItems,
   createIssuePanelMeta,
   createLogPanelItems,
@@ -100,6 +103,90 @@ describe("plugin view model", () => {
         badge: "WARNING",
         timestamp: "2026-03-18 13:04:59.000 UTC",
         message: "Quartz emitted a warning."
+      }
+    ]);
+  });
+
+  it("builds control panel metadata and action state", () => {
+    const state = createState({
+      lastCommand: "preview",
+      lastUpdatedAt: "2026-03-18T13:05:00.000Z",
+      statusMessage: "站点预览已启动：http://localhost:8080",
+      lastLogPath: "D:/vault/.osp/logs/preview.log",
+      lastPreviewSession: {
+        url: "http://localhost:8080",
+        workspaceRoot: "D:/vault/.osp/preview",
+        startedAt: "2026-03-18T13:04:59.000Z"
+      },
+      lastIssues: [
+        {
+          code: "BROKEN_LINK",
+          severity: "error",
+          file: "Broken.md",
+          message: "Link target is missing."
+        }
+      ]
+    });
+
+    expect(createControlPanelMeta(state, "build")).toEqual({
+      title: "站点发布",
+      summary: "正在执行：构建。面板会在任务完成后自动刷新。",
+      statusMessage: "站点预览已启动：http://localhost:8080"
+    });
+    expect(createControlPanelActions("build")).toEqual([
+      {
+        command: "issues",
+        label: "检查问题",
+        description: "扫描当前配置下的阻断项和提示。",
+        buttonLabel: "检查问题",
+        isRunning: false,
+        isDisabled: true
+      },
+      {
+        command: "build",
+        label: "构建站点",
+        description: "生成静态站点文件，但不执行发布。",
+        buttonLabel: "正在构建站点...",
+        isRunning: true,
+        isDisabled: true
+      },
+      {
+        command: "preview",
+        label: "启动预览",
+        description: "启动本地预览服务，便于先检查效果。",
+        buttonLabel: "启动预览",
+        isRunning: false,
+        isDisabled: true
+      },
+      {
+        command: "publish",
+        label: "发布站点",
+        description: "按当前发布目标执行构建并发布。",
+        buttonLabel: "发布站点",
+        isRunning: false,
+        isDisabled: true
+      }
+    ]);
+    expect(createControlPanelStatusItems(state, { showInformationalIssues: false })).toEqual([
+      {
+        label: "最近问题",
+        value: "共 1 个待关注问题"
+      },
+      {
+        label: "最近命令",
+        value: "预览"
+      },
+      {
+        label: "预览地址",
+        value: "http://localhost:8080"
+      },
+      {
+        label: "日志文件",
+        value: "D:/vault/.osp/logs/preview.log"
+      },
+      {
+        label: "最近更新",
+        value: "2026-03-18T13:05:00.000Z"
       }
     ]);
   });

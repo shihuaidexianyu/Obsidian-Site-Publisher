@@ -28,7 +28,7 @@ describe("PluginCommandController", () => {
     expect(host.beginProgress).toHaveBeenCalledWith("preview");
     expect(host.setStatus).toHaveBeenCalledWith("站点发布：预览已启动");
     expect(host.showNotice).toHaveBeenCalledWith("站点预览已启动：http://localhost:8080");
-    expect(host.refreshViews).toHaveBeenCalledOnce();
+    expect(host.refreshViews).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces command failures as readable host messages", async () => {
@@ -48,7 +48,7 @@ describe("PluginCommandController", () => {
     expect(host.showNotice).toHaveBeenCalledWith(
       "预览失败：Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
     );
-    expect(host.refreshViews).toHaveBeenCalledOnce();
+    expect(host.refreshViews).toHaveBeenCalledTimes(2);
   });
 
   it("refreshes plugin views without auto-revealing side panels", async () => {
@@ -62,7 +62,7 @@ describe("PluginCommandController", () => {
 
     expect(host.revealIssueListView).not.toHaveBeenCalled();
     expect(host.revealBuildLogView).not.toHaveBeenCalled();
-    expect(host.refreshViews).toHaveBeenCalledOnce();
+    expect(host.refreshViews).toHaveBeenCalledTimes(2);
   });
 
   it("prevents starting a second command while one is still running", async () => {
@@ -83,6 +83,25 @@ describe("PluginCommandController", () => {
 
     expect(shell.runCommand).toHaveBeenCalledTimes(1);
     expect(host.showNotice).toHaveBeenCalledWith("已有任务正在运行：构建。请等待当前任务完成。");
+  });
+
+  it("exposes the active command while work is in progress", async () => {
+    let resolveCommand: (() => void) | undefined;
+    const host = createHost();
+    const shell = {
+      getCommandDefinitions: vi.fn(() => []),
+      runCommand: vi.fn(() => new Promise<PluginCommandResult>((resolve) => {
+        resolveCommand = () => resolve(createCommandResult("build", "站点构建完成。"));
+      }))
+    };
+    const controller = new PluginCommandController(shell, host, () => createConfig("/vault"));
+
+    const runningCommand = controller.runCommand("build");
+
+    expect(controller.getActiveCommand()).toBe("build");
+    resolveCommand?.();
+    await runningCommand;
+    expect(controller.getActiveCommand()).toBeUndefined();
   });
 });
 
