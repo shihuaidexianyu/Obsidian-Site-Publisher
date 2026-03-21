@@ -107,7 +107,6 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
         new PublisherControlView(
           leaf,
           () => this.shell.getState(),
-          () => this.settings.ui,
           () => this.controller?.getActiveCommand(),
           async (command) => {
             if (this.controller === undefined) {

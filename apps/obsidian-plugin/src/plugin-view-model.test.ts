@@ -168,11 +168,7 @@ describe("plugin view model", () => {
         isDisabled: true
       }
     ]);
-    expect(createControlPanelStatusItems(state, { showInformationalIssues: false })).toEqual([
-      {
-        label: "最近问题",
-        value: "共 1 个待关注问题"
-      },
+    expect(createControlPanelStatusItems(state)).toEqual([
       {
         label: "最近命令",
         value: "预览"

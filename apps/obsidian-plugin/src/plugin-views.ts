@@ -30,7 +30,6 @@ export class PublisherControlView extends ItemView {
   public constructor(
     leaf: WorkspaceLeaf,
     private readonly readState: StateReader,
-    private readonly readUi: UiSettingsReader,
     private readonly readActiveCommand: ActiveCommandReader,
     private readonly runCommand: CommandRunner
   ) {
@@ -58,7 +57,7 @@ export class PublisherControlView extends ItemView {
   }
 
   public refresh(): void {
-    renderControlPanel(this.contentEl, this.readState(), this.readUi(), this.readActiveCommand(), this.runCommand);
+    renderControlPanel(this.contentEl, this.readState(), this.readActiveCommand(), this.runCommand);
   }
 }
 
@@ -117,15 +116,12 @@ export class BuildLogView extends ItemView {
 function renderControlPanel(
   containerEl: HTMLElement,
   state: PluginExecutionState,
-  ui: PublisherPluginUiSettings,
   activeCommand: PluginCommand | undefined,
   runCommand: CommandRunner
 ): void {
   const meta = createControlPanelMeta(state, activeCommand);
   const actions = createControlPanelActions(activeCommand);
-  const statusItems = createControlPanelStatusItems(state, ui);
-  const issueItems = createIssuePanelItems(state, ui).slice(0, 3);
-  const logItems = createLogPanelItems(state).slice(0, 3);
+  const statusItems = createControlPanelStatusItems(state);
 
   containerEl.empty();
   containerEl.addClass("osp-panel", "osp-control-panel");
@@ -224,36 +220,6 @@ function renderControlPanel(
       void copyTextToClipboard(item.copyValue as string);
     });
   }
-
-  renderPreviewSection(containerEl, "最近问题", issueItems, "暂无问题摘要。", (parent, item) => {
-    parent.createEl("div", {
-      cls: "osp-panel-badge",
-      text: item.badge
-    });
-    parent.createEl("div", {
-      cls: "osp-panel-path",
-      text: item.fileLabel
-    });
-    parent.createEl("div", {
-      cls: "osp-panel-message",
-      text: item.message
-    });
-  });
-
-  renderPreviewSection(containerEl, "最近日志", logItems, "暂无日志摘要。", (parent, item) => {
-    parent.createEl("div", {
-      cls: "osp-panel-badge",
-      text: item.badge
-    });
-    parent.createEl("div", {
-      cls: "osp-panel-path",
-      text: item.timestamp
-    });
-    parent.createEl("div", {
-      cls: "osp-panel-message",
-      text: item.message
-    });
-  });
 }
 
 async function copyTextToClipboard(value: string): Promise<void> {
@@ -388,40 +354,6 @@ function renderPanel<T extends IssuePanelItem | LogPanelItem>(
       cls: "osp-panel-item"
     });
 
-    renderItem(itemEl, item);
-  }
-}
-
-function renderPreviewSection<T extends IssuePanelItem | LogPanelItem>(
-  containerEl: HTMLElement,
-  title: string,
-  items: T[],
-  emptyMessage: string,
-  renderItem: (parent: HTMLElement, item: T) => void
-): void {
-  const sectionEl = containerEl.createDiv({
-    cls: "osp-section"
-  });
-  sectionEl.createEl("h3", {
-    text: title
-  });
-
-  if (items.length === 0) {
-    sectionEl.createEl("p", {
-      cls: "osp-panel-empty",
-      text: emptyMessage
-    });
-    return;
-  }
-
-  const listEl = sectionEl.createDiv({
-    cls: "osp-panel-list"
-  });
-
-  for (const item of items) {
-    const itemEl = listEl.createDiv({
-      cls: "osp-panel-item"
-    });
     renderItem(itemEl, item);
   }
 }

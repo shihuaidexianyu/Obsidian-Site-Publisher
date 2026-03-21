@@ -125,16 +125,9 @@ export function createControlPanelActions(activeCommand: PluginCommand | undefin
 }
 
 export function createControlPanelStatusItems(
-  state: PluginExecutionState,
-  ui: PublisherPluginUiSettings
+  state: PluginExecutionState
 ): ControlPanelStatusItem[] {
-  const visibleIssues = filterVisibleIssues(state, ui);
-  const items: ControlPanelStatusItem[] = [
-    {
-      label: "最近问题",
-      value: visibleIssues.length === 0 ? "没有需要处理的问题" : `共 ${visibleIssues.length} 个待关注问题`
-    }
-  ];
+  const items: ControlPanelStatusItem[] = [];
 
   if (state.lastCommand !== undefined) {
     items.push({
