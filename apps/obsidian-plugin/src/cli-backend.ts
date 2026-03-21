@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -32,6 +32,7 @@ import type {
   PluginPublishResult,
   PluginScanResult
 } from "./plugin-backend.js";
+import { PluginExecutionError as LoggedPluginExecutionError } from "./plugin-backend.js";
 type CliBackendOptions = {
   cliCommand: string;
   logDirectory?: string;
@@ -123,6 +124,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
 
     const cliCommand = this.options.cliCommand;
     const normalizedConfig = normalizePluginConfig(config);
+    const fallbackLogPath = resolveFallbackLogPath("preview", normalizedConfig.vaultRoot, this.options.logDirectory);
     const tempDir = await createCliTempDirectory(this.options.tempRoot);
     const configPath = path.join(tempDir, "publisher.config.json");
 
@@ -201,8 +203,16 @@ export class CliPluginBackend implements PluginExecutionBackend {
     } catch (error) {
       await stopChildProcess(child);
       await exitState.catch(() => undefined);
+      await appendCliFailureLog({
+        logPath: fallbackLogPath,
+        command: "preview",
+        cliCommand,
+        error,
+        stdout,
+        stderr
+      }).catch(() => undefined);
       await rm(tempDir, { recursive: true, force: true });
-      throw enrichCliLaunchError(cliCommand, error);
+      throw createLoggedExecutionError(enrichCliLaunchError(cliCommand, error), fallbackLogPath);
     }
   }
 
@@ -214,8 +224,10 @@ export class CliPluginBackend implements PluginExecutionBackend {
   ): Promise<z.output<TSchema>> {
     const cliCommand = this.options.cliCommand;
     const normalizedConfig = normalizePluginConfig(config);
+    const fallbackLogPath = resolveFallbackLogPath(command, normalizedConfig.vaultRoot, this.options.logDirectory);
     const tempDir = await createCliTempDirectory(this.options.tempRoot);
     const configPath = path.join(tempDir, "publisher.config.json");
+    let completed: CompletedCliProcess | undefined;
 
     await writeCliConfig(configPath, normalizedConfig);
     if (build !== undefined) {
@@ -223,7 +235,7 @@ export class CliPluginBackend implements PluginExecutionBackend {
     }
 
     try {
-      const completed = await runCliProcess(this.options.cliCommand, this.createCliArgs(command, configPath, build), {
+      completed = await runCliProcess(this.options.cliCommand, this.createCliArgs(command, configPath, build), {
         cwd: normalizedConfig.vaultRoot
       });
       const payload = tryParseCliPayload(completed.stdout, schema);
@@ -234,7 +246,15 @@ export class CliPluginBackend implements PluginExecutionBackend {
 
       return payload;
     } catch (error) {
-      throw enrichCliLaunchError(cliCommand, error);
+      await appendCliFailureLog({
+        logPath: fallbackLogPath,
+        command,
+        cliCommand,
+        error,
+        stdout: completed?.stdout,
+        stderr: completed?.stderr
+      }).catch(() => undefined);
+      throw createLoggedExecutionError(enrichCliLaunchError(cliCommand, error), fallbackLogPath);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
@@ -415,4 +435,71 @@ function normalizeCliCommand(cliCommand: string): string {
   }
 
   return trimmedCommand;
+}
+
+function createLoggedExecutionError(error: Error, logPath: string): LoggedPluginExecutionError {
+  return new LoggedPluginExecutionError(error.message, {
+    cause: error,
+    logPath
+  });
+}
+
+function resolveFallbackLogPath(command: "scan" | "build" | "preview" | "deploy", vaultRoot: string, logDirectory: string | undefined): string {
+  const directoryPath = logDirectory ?? path.join(vaultRoot, ".osp", "logs");
+  return path.join(directoryPath, `${command}-fallback.log`);
+}
+
+async function appendCliFailureLog(input: {
+  logPath: string;
+  command: "scan" | "build" | "preview" | "deploy";
+  cliCommand: string;
+  error: unknown;
+  stdout?: string | undefined;
+  stderr?: string | undefined;
+}): Promise<void> {
+  const lines = [
+    `[${new Date().toISOString()}] ERROR Plugin observed CLI failure during ${input.command}.`,
+    `CLI command: ${input.cliCommand}`,
+    `Message: ${formatUnknownError(input.error)}`
+  ];
+
+  const stdout = normalizeLoggedOutput(input.stdout);
+  const stderr = normalizeLoggedOutput(input.stderr);
+
+  if (stderr !== undefined) {
+    lines.push("stderr:");
+    lines.push(stderr);
+  }
+
+  if (stdout !== undefined) {
+    lines.push("stdout:");
+    lines.push(stdout);
+  }
+
+  lines.push("");
+
+  await mkdir(path.dirname(input.logPath), { recursive: true });
+  await appendFile(input.logPath, `${lines.join("\n")}\n`, "utf8");
+}
+
+function normalizeLoggedOutput(output: string | undefined): string | undefined {
+  if (output === undefined) {
+    return undefined;
+  }
+
+  const trimmedOutput = output.trim();
+  return trimmedOutput === "" ? undefined : trimmedOutput;
+}
+
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  const serializedError = JSON.stringify(error);
+  return serializedError ?? "Unknown error";
 }

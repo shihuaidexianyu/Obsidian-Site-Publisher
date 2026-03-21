@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -99,6 +99,48 @@ describe("CliPluginBackend", () => {
 
     expect(preview.session.url).toBe("http://127.0.0.1:43180");
     await backend.dispose();
+  });
+
+  it("writes a fallback log file when a one-shot CLI command fails before returning JSON", async () => {
+    const pluginRoot = await createTempDirectory();
+    const cliEntrypoint = path.join(pluginRoot, "broken-cli.js");
+
+    await writeFile(cliEntrypoint, createBrokenCliScript(), "utf8");
+
+    const backend = new CliPluginBackend({
+      cliCommand: cliEntrypoint,
+      logDirectory: path.join(pluginRoot, ".osp", "logs")
+    });
+
+    await expect(backend.scan(createConfig(pluginRoot))).rejects.toMatchObject({
+      logPath: path.join(pluginRoot, ".osp", "logs", "scan-fallback.log")
+    });
+
+    const logContents = await readFile(path.join(pluginRoot, ".osp", "logs", "scan-fallback.log"), "utf8");
+    expect(logContents).toContain("Plugin observed CLI failure during scan.");
+    expect(logContents).toContain("Broken scan configuration");
+    expect(logContents).toContain("stdout:");
+    expect(logContents).toContain("still trying");
+  });
+
+  it("writes a fallback log file when preview exits before emitting a session payload", async () => {
+    const pluginRoot = await createTempDirectory();
+    const cliEntrypoint = path.join(pluginRoot, "broken-preview-cli.js");
+
+    await writeFile(cliEntrypoint, createBrokenPreviewCliScript(), "utf8");
+
+    const backend = new CliPluginBackend({
+      cliCommand: cliEntrypoint,
+      logDirectory: path.join(pluginRoot, ".osp", "logs")
+    });
+
+    await expect(backend.preview(createConfig(pluginRoot))).rejects.toMatchObject({
+      logPath: path.join(pluginRoot, ".osp", "logs", "preview-fallback.log")
+    });
+
+    const logContents = await readFile(path.join(pluginRoot, ".osp", "logs", "preview-fallback.log"), "utf8");
+    expect(logContents).toContain("Plugin observed CLI failure during preview.");
+    expect(logContents).toContain("Preview server crashed");
   });
 });
 
@@ -211,5 +253,20 @@ console.log(JSON.stringify({
     message: "Published."
   }
 }));
+`;
+}
+
+function createBrokenCliScript(): string {
+  return `
+process.stdout.write("still trying\\n");
+process.stderr.write("Broken scan configuration\\n");
+process.exit(1);
+`;
+}
+
+function createBrokenPreviewCliScript(): string {
+  return `
+process.stderr.write("Preview server crashed\\n");
+process.exit(1);
 `;
 }

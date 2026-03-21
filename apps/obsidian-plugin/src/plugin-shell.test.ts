@@ -1,7 +1,7 @@
 import type { BuildResult, DeployResult, PreviewSession, PublisherConfig, VaultManifest } from "@osp/shared";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PluginExecutionBackend } from "./plugin-backend.js";
+import { PluginExecutionError, type PluginExecutionBackend } from "./plugin-backend.js";
 import { PublisherPluginShell } from "./plugin-shell.js";
 
 describe("PublisherPluginShell", () => {
@@ -248,6 +248,23 @@ describe("PublisherPluginShell", () => {
     expect(result.command).toBe("publish");
     expect(backend.publish).toHaveBeenCalledOnce();
     expect(plugin.getState().statusMessage).toBe("发布已停止，因为构建没有成功。");
+  });
+
+  it("stores fallback log metadata when a command fails", async () => {
+    const backend = createBackend();
+    backend.build = vi.fn(async () => {
+      throw new PluginExecutionError("启动外部 publisher-cli 失败。", {
+        logPath: "/vault/.osp/logs/build-fallback.log"
+      });
+    });
+    const plugin = new PublisherPluginShell(() => backend);
+
+    await expect(plugin.runCommand("build", createConfig("/vault"))).rejects.toThrow("启动外部 publisher-cli 失败。");
+    expect(plugin.getState()).toMatchObject({
+      lastCommand: "build",
+      lastLogPath: "/vault/.osp/logs/build-fallback.log",
+      statusMessage: "构建失败，请检查日志。"
+    });
   });
 });
 

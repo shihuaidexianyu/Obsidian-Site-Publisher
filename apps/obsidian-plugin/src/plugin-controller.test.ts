@@ -1,6 +1,7 @@
 import type { PublisherConfig } from "@osp/shared";
 import { describe, expect, it, vi } from "vitest";
 
+import { PluginExecutionError } from "./plugin-backend.js";
 import type { PluginCommand, PluginCommandDefinition, PluginCommandResult } from "./plugin-shell.js";
 import { PluginCommandController } from "./plugin-controller.js";
 
@@ -50,6 +51,25 @@ describe("PluginCommandController", () => {
       "预览失败：Cannot preview in strict mode while 2 warning issue(s) remain unresolved."
     );
     expect(host.refreshViews).toHaveBeenCalledTimes(2);
+  });
+
+  it("includes the log path when a command failure exposes one", async () => {
+    const host = createHost();
+    const shell = {
+      getCommandDefinitions: vi.fn(() => []),
+      runCommand: vi.fn(async () => {
+        throw new PluginExecutionError("外部 CLI 执行“构建”失败，退出码为 1。", {
+          logPath: "/vault/.osp/logs/build-fallback.log"
+        });
+      })
+    };
+    const controller = new PluginCommandController(shell, host, () => createConfig("/vault"));
+
+    await controller.runCommand("build");
+
+    expect(host.showNotice).toHaveBeenCalledWith(
+      "构建失败：外部 CLI 执行“构建”失败，退出码为 1。 请查看日志：/vault/.osp/logs/build-fallback.log"
+    );
   });
 
   it("refreshes plugin views without auto-revealing side panels", async () => {

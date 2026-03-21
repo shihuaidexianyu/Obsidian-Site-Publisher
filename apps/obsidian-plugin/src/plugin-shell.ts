@@ -5,6 +5,7 @@ import type {
   PluginPublishResult,
   PluginScanResult
 } from "./plugin-backend.js";
+import { getPluginErrorLogPath } from "./plugin-backend.js";
 
 export const pluginManifest = {
   id: "obsidian-site-publisher",
@@ -149,51 +150,73 @@ export class PublisherPluginShell {
   }
 
   private async runIssuesCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "issues" }>> {
-    const report = await backend.scan(config);
-    const statusMessage = createIssuesStatusMessage(report.issues.length);
+    try {
+      const report = await backend.scan(config);
+      const statusMessage = createIssuesStatusMessage(report.issues.length);
 
-    this.updateState({
-      lastCommand: "issues",
-      statusMessage,
-      lastLogPath: report.logPath,
-      lastManifest: report.manifest,
-      lastIssues: report.issues,
-      lastLogs: [],
-      lastBuildResult: undefined,
-      lastPreviewSession: undefined,
-      lastDeployResult: undefined
-    });
+      this.updateState({
+        lastCommand: "issues",
+        statusMessage,
+        lastLogPath: report.logPath,
+        lastManifest: report.manifest,
+        lastIssues: report.issues,
+        lastLogs: [],
+        lastBuildResult: undefined,
+        lastPreviewSession: undefined,
+        lastDeployResult: undefined
+      });
 
-    return {
-      command: "issues",
-      manifest: report.manifest,
-      issues: report.issues,
-      statusMessage
-    };
+      return {
+        command: "issues",
+        manifest: report.manifest,
+        issues: report.issues,
+        statusMessage
+      };
+    } catch (error) {
+      this.captureCommandFailure("issues", error, {
+        lastManifest: undefined,
+        lastIssues: [],
+        lastLogs: [],
+        lastBuildResult: undefined,
+        lastPreviewSession: undefined,
+        lastDeployResult: undefined
+      });
+      throw error;
+    }
   }
 
   private async runBuildCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "build" }>> {
-    const build = await backend.build(config);
-    const result = build.result;
-    const statusMessage = result.success ? "站点构建完成。" : "站点构建失败，请检查问题和日志。";
-    this.captureReusableBuild(config, result);
+    try {
+      const build = await backend.build(config);
+      const result = build.result;
+      const statusMessage = result.success ? "站点构建完成。" : "站点构建失败，请检查问题和日志。";
+      this.captureReusableBuild(config, result);
 
-    this.updateState({
-      lastCommand: "build",
-      statusMessage,
-      lastLogPath: build.logPath,
-      lastIssues: result.issues,
-      lastLogs: retainRecentLogs(result.logs),
-      lastBuildResult: result,
-      lastPreviewSession: undefined,
-      lastDeployResult: undefined
-    });
+      this.updateState({
+        lastCommand: "build",
+        statusMessage,
+        lastLogPath: build.logPath,
+        lastIssues: result.issues,
+        lastLogs: retainRecentLogs(result.logs),
+        lastBuildResult: result,
+        lastPreviewSession: undefined,
+        lastDeployResult: undefined
+      });
 
-    return {
-      command: "build",
-      result,
-      statusMessage
-    };
+      return {
+        command: "build",
+        result,
+        statusMessage
+      };
+    } catch (error) {
+      this.captureCommandFailure("build", error, {
+        lastLogs: [],
+        lastBuildResult: undefined,
+        lastPreviewSession: undefined,
+        lastDeployResult: undefined
+      });
+      throw error;
+    }
   }
 
   private async runPreviewCommand(config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "preview" }>> {
@@ -225,43 +248,74 @@ export class PublisherPluginShell {
         statusMessage
       };
     } catch (error) {
+      this.captureCommandFailure("preview", error, {
+        lastLogs: [],
+        lastPreviewSession: undefined,
+        lastDeployResult: undefined
+      });
       await backend.dispose();
       throw error;
     }
   }
 
   private async runPublishCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "publish" }>> {
-    const reusableBuild = this.getReusableBuild(config);
+    try {
+      const reusableBuild = this.getReusableBuild(config);
 
-    if (reusableBuild !== undefined) {
-      const reusedDeploy = await backend.deployBuilt(reusableBuild, config);
-      const statusMessage = reusedDeploy.deploy.success ? "站点发布成功。" : "构建成功，但发布失败。";
+      if (reusableBuild !== undefined) {
+        const reusedDeploy = await backend.deployBuilt(reusableBuild, config);
+        const statusMessage = reusedDeploy.deploy.success ? "站点发布成功。" : "构建成功，但发布失败。";
 
-      this.updateState({
-        lastCommand: "publish",
-        statusMessage,
-        lastLogPath: reusedDeploy.logPath,
-        lastIssues: reusableBuild.issues,
-        lastLogs: retainRecentLogs(reusableBuild.logs),
-        lastBuildResult: reusableBuild,
-        lastPreviewSession: undefined,
-        lastDeployResult: reusedDeploy.deploy
-      });
+        this.updateState({
+          lastCommand: "publish",
+          statusMessage,
+          lastLogPath: reusedDeploy.logPath,
+          lastIssues: reusableBuild.issues,
+          lastLogs: retainRecentLogs(reusableBuild.logs),
+          lastBuildResult: reusableBuild,
+          lastPreviewSession: undefined,
+          lastDeployResult: reusedDeploy.deploy
+        });
 
-      return {
-        command: "publish",
-        build: reusableBuild,
-        deploy: reusedDeploy.deploy,
-        statusMessage
-      };
-    }
+        return {
+          command: "publish",
+          build: reusableBuild,
+          deploy: reusedDeploy.deploy,
+          statusMessage
+        };
+      }
 
-    const publishResult = await backend.publish(config);
-    const { build, deploy } = publishResult;
-    this.captureReusableBuild(config, build);
+      const publishResult = await backend.publish(config);
+      const { build, deploy } = publishResult;
+      this.captureReusableBuild(config, build);
 
-    if (!build.success) {
-      const statusMessage = "发布已停止，因为构建没有成功。";
+      if (!build.success) {
+        const statusMessage = "发布已停止，因为构建没有成功。";
+
+        this.updateState({
+          lastCommand: "publish",
+          statusMessage,
+          lastLogPath: publishResult.logPath,
+          lastIssues: build.issues,
+          lastLogs: retainRecentLogs(build.logs),
+          lastBuildResult: build,
+          lastPreviewSession: undefined,
+          lastDeployResult: undefined
+        });
+
+        return {
+          command: "publish",
+          build,
+          statusMessage
+        };
+      }
+
+      const statusMessage =
+        deploy === undefined
+          ? "构建已完成，但发布步骤没有返回结果。"
+          : deploy.success
+            ? "站点发布成功。"
+            : "构建成功，但发布失败。";
 
       this.updateState({
         lastCommand: "publish",
@@ -271,40 +325,23 @@ export class PublisherPluginShell {
         lastLogs: retainRecentLogs(build.logs),
         lastBuildResult: build,
         lastPreviewSession: undefined,
-        lastDeployResult: undefined
+        lastDeployResult: deploy
       });
 
       return {
         command: "publish",
         build,
+        ...(deploy === undefined ? {} : { deploy }),
         statusMessage
       };
+    } catch (error) {
+      this.captureCommandFailure("publish", error, {
+        lastLogs: [],
+        lastPreviewSession: undefined,
+        lastDeployResult: undefined
+      });
+      throw error;
     }
-
-    const statusMessage =
-      deploy === undefined
-        ? "构建已完成，但发布步骤没有返回结果。"
-        : deploy.success
-          ? "站点发布成功。"
-          : "构建成功，但发布失败。";
-
-    this.updateState({
-      lastCommand: "publish",
-      statusMessage,
-      lastLogPath: publishResult.logPath,
-      lastIssues: build.issues,
-      lastLogs: retainRecentLogs(build.logs),
-      lastBuildResult: build,
-      lastPreviewSession: undefined,
-      lastDeployResult: deploy
-    });
-
-    return {
-      command: "publish",
-      build,
-      ...(deploy === undefined ? {} : { deploy }),
-      statusMessage
-    };
   }
 
   private updateState(nextState: Partial<PluginExecutionState>): void {
@@ -355,6 +392,17 @@ export class PublisherPluginShell {
       build
     };
   }
+
+  private captureCommandFailure(command: PluginCommand, error: unknown, nextState: Partial<PluginExecutionState>): void {
+    const logPath = getPluginErrorLogPath(error);
+
+    this.updateState({
+      lastCommand: command,
+      statusMessage: createFailureStatusMessage(command, logPath),
+      lastLogPath: logPath,
+      ...nextState
+    });
+  }
 }
 
 function retainRecentLogs(logs: BuildLogEntry[]): BuildLogEntry[] {
@@ -403,6 +451,22 @@ function createIssuesStatusMessage(issueCount: number): string {
   return `发现 ${issueCount} 个发布问题。`;
 }
 
+function createFailureStatusMessage(command: PluginCommand, logPath: string | undefined): string {
+  const commandLabel = command === "issues" ? "检查问题" : formatCommandLabel(command);
+  return logPath === undefined ? `${commandLabel}失败。` : `${commandLabel}失败，请检查日志。`;
+}
+
 function createConfigKey(config: PublisherConfig): string {
   return JSON.stringify(config);
+}
+
+function formatCommandLabel(command: Exclude<PluginCommand, "issues">): string {
+  switch (command) {
+    case "preview":
+      return "预览";
+    case "build":
+      return "构建";
+    case "publish":
+      return "发布";
+  }
 }

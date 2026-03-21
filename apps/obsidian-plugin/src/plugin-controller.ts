@@ -1,5 +1,6 @@
 import type { PublisherConfig } from "@osp/shared";
 
+import { getPluginErrorLogPath } from "./plugin-backend.js";
 import type { PluginCommand, PluginCommandDefinition, PluginCommandResult } from "./plugin-shell.js";
 
 export type PluginHost = {
@@ -73,12 +74,14 @@ export class PluginCommandController {
 
 function formatPluginCommandError(command: PluginCommand, error: unknown): string {
   const commandLabel = formatCommandLabel(command);
+  const logPath = getPluginErrorLogPath(error);
+  const logSuffix = logPath === undefined ? "" : ` 请查看日志：${logPath}`;
 
   if (error instanceof Error) {
-    return `${commandLabel}失败：${error.message}`;
+    return `${commandLabel}失败：${error.message}${logSuffix}`;
   }
 
-  return `${commandLabel}失败：发生了未知错误。`;
+  return `${commandLabel}失败：发生了未知错误。${logSuffix}`;
 }
 
 function createStatusBarMessage(result: PluginCommandResult): string {

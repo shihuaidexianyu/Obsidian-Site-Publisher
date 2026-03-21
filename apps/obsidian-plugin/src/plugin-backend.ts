@@ -36,3 +36,27 @@ export type PluginExecutionBackend = {
   deployBuilt(build: BuildResult, config: PublisherConfig): Promise<PluginDeployFromBuildResult>;
   dispose(): Promise<void>;
 };
+
+export class PluginExecutionError extends Error {
+  public readonly logPath?: string | undefined;
+
+  public constructor(message: string, options: { logPath?: string | undefined; cause?: unknown } = {}) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = "PluginExecutionError";
+    this.logPath = options.logPath;
+  }
+}
+
+export function getPluginErrorLogPath(error: unknown): string | undefined {
+  if (error instanceof PluginExecutionError) {
+    return error.logPath;
+  }
+
+  if (error instanceof Error && "logPath" in error) {
+    const logPath = (error as Error & { logPath?: unknown }).logPath;
+
+    return typeof logPath === "string" && logPath !== "" ? logPath : undefined;
+  }
+
+  return undefined;
+}
