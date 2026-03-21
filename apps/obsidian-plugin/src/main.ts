@@ -8,6 +8,7 @@ import { PublisherPluginSettingTab } from "./plugin-settings-tab.js";
 import {
   BuildLogView,
   BUILD_LOG_VIEW_TYPE,
+  CONTROL_PANEL_VIEW_ICON,
   CONTROL_PANEL_VIEW_TYPE,
   IssueListView,
   ISSUE_LIST_VIEW_TYPE,
@@ -72,7 +73,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
 
     this.controller.registerCommands();
     this.statusBarEl.setText("站点发布插件已就绪");
-    this.addRibbonIcon("rocket", "打开站点发布面板", () => {
+    this.addRibbonIcon(CONTROL_PANEL_VIEW_ICON, "打开站点发布面板", () => {
       void this.revealPluginView(CONTROL_PANEL_VIEW_TYPE);
     });
     this.addSettingTab(new PublisherPluginSettingTab(this.app, this));

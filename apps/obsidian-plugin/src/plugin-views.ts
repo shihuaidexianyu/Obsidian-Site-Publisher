@@ -17,6 +17,7 @@ import type { PluginCommand, PluginExecutionState } from "./plugin-shell.js";
 import type { PublisherPluginUiSettings } from "./settings.js";
 
 export const CONTROL_PANEL_VIEW_TYPE = "osp-control-panel-view";
+export const CONTROL_PANEL_VIEW_ICON = "globe";
 export const ISSUE_LIST_VIEW_TYPE = "osp-issues-view";
 export const BUILD_LOG_VIEW_TYPE = "osp-build-logs-view";
 
@@ -42,6 +43,10 @@ export class PublisherControlView extends ItemView {
 
   public override getDisplayText(): string {
     return "站点发布";
+  }
+
+  public override getIcon(): string {
+    return CONTROL_PANEL_VIEW_ICON;
   }
 
   public override async onOpen(): Promise<void> {
