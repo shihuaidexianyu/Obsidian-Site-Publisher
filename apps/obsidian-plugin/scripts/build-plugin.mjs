@@ -9,6 +9,7 @@ const workspaceRoot = path.resolve(pluginRoot, "..", "..");
 const workspaceRequire = createRequire(path.join(workspaceRoot, "package.json"));
 const packageJsonPath = path.join(workspaceRoot, "package.json");
 const manifestPath = path.join(pluginRoot, "manifest.json");
+const stylesPath = path.join(pluginRoot, "styles.css");
 const releaseRoot = path.join(workspaceRoot, ".obsidian-plugin-build");
 const { build } = await import(pathToFileURL(workspaceRequire.resolve("esbuild")).href);
 
@@ -40,6 +41,7 @@ await build({
 });
 
 await cp(manifestPath, path.join(pluginReleaseDir, "manifest.json"), { force: true });
+await cp(stylesPath, path.join(pluginReleaseDir, "styles.css"), { force: true });
 await writeFile(
   path.join(pluginReleaseDir, "versions.json"),
   JSON.stringify(

@@ -123,41 +123,69 @@ function renderControlPanel(
   const logItems = createLogPanelItems(state).slice(0, 3);
 
   containerEl.empty();
-  containerEl.addClass("osp-panel");
-  containerEl.createEl("h2", {
+  containerEl.addClass("osp-panel", "osp-control-panel");
+
+  const headerEl = containerEl.createDiv({
+    cls: "osp-panel-header"
+  });
+  headerEl.createEl("div", {
+    cls: "osp-panel-kicker",
+    text: "Publisher"
+  });
+  headerEl.createEl("h2", {
     text: meta.title
   });
-  containerEl.createEl("p", {
+  headerEl.createEl("p", {
     cls: "osp-panel-summary",
     text: meta.summary
   });
-  containerEl.createEl("div", {
-    cls: "osp-panel-message",
+
+  const statusCardEl = containerEl.createDiv({
+    cls: "osp-status-card"
+  });
+  statusCardEl.createEl("div", {
+    cls: "osp-panel-kicker",
+    text: activeCommand === undefined ? "当前状态" : "任务进行中"
+  });
+  statusCardEl.createEl("div", {
+    cls: "osp-status-card-message",
     text: meta.statusMessage
   });
 
-  const actionsEl = containerEl.createDiv({
-    cls: "osp-panel-list"
+  const actionsSectionEl = containerEl.createDiv({
+    cls: "osp-section"
+  });
+  actionsSectionEl.createEl("h3", {
+    text: "快速操作"
+  });
+  const actionsEl = actionsSectionEl.createDiv({
+    cls: "osp-action-grid"
   });
 
   for (const action of actions) {
     renderControlPanelAction(actionsEl, action, runCommand);
   }
 
-  const statusEl = containerEl.createDiv({
-    cls: "osp-panel-list"
+  const statusSectionEl = containerEl.createDiv({
+    cls: "osp-section"
+  });
+  statusSectionEl.createEl("h3", {
+    text: "运行概览"
+  });
+  const statusEl = statusSectionEl.createDiv({
+    cls: "osp-meta-grid"
   });
 
   for (const item of statusItems) {
     const itemEl = statusEl.createDiv({
-      cls: "osp-panel-item"
+      cls: "osp-meta-card"
     });
     itemEl.createEl("div", {
-      cls: "osp-panel-badge",
+      cls: "osp-meta-label",
       text: item.label
     });
     itemEl.createEl("div", {
-      cls: "osp-panel-message",
+      cls: "osp-meta-value",
       text: item.value
     });
   }
@@ -242,27 +270,34 @@ function renderLogPanel(containerEl: HTMLElement, state: PluginExecutionState): 
 
 function renderControlPanelAction(parent: HTMLElement, action: ControlPanelAction, runCommand: CommandRunner): void {
   const itemEl = parent.createDiv({
-    cls: "osp-panel-item"
-  });
-  const buttonEl = itemEl.createEl("button", {
-    text: action.buttonLabel
+    cls: "osp-action-card"
   });
 
-  if (action.command === "publish") {
-    buttonEl.addClass("mod-cta");
-  }
+  const cardHeaderEl = itemEl.createDiv({
+    cls: "osp-action-card-header"
+  });
+  cardHeaderEl.createEl("div", {
+    cls: "osp-action-card-title",
+    text: action.label
+  });
+  cardHeaderEl.createEl("div", {
+    cls: action.isRunning ? "osp-action-card-state is-running" : "osp-action-card-state",
+    text: action.isRunning ? "运行中" : "待命"
+  });
+
+  itemEl.createEl("div", {
+    cls: "osp-action-card-description",
+    text: action.description
+  });
+
+  const buttonEl = itemEl.createEl("button", {
+    cls: action.command === "publish" ? "mod-cta osp-action-button" : "osp-action-button",
+    text: action.buttonLabel
+  });
 
   buttonEl.disabled = action.isDisabled;
   buttonEl.addEventListener("click", () => {
     void runCommand(action.command);
-  });
-  itemEl.createEl("div", {
-    cls: "osp-panel-path",
-    text: action.label
-  });
-  itemEl.createEl("div", {
-    cls: "osp-panel-message",
-    text: action.description
   });
 }
 
@@ -310,19 +345,22 @@ function renderPreviewSection<T extends IssuePanelItem | LogPanelItem>(
   emptyMessage: string,
   renderItem: (parent: HTMLElement, item: T) => void
 ): void {
-  containerEl.createEl("h3", {
+  const sectionEl = containerEl.createDiv({
+    cls: "osp-section"
+  });
+  sectionEl.createEl("h3", {
     text: title
   });
 
   if (items.length === 0) {
-    containerEl.createEl("p", {
+    sectionEl.createEl("p", {
       cls: "osp-panel-empty",
       text: emptyMessage
     });
     return;
   }
 
-  const listEl = containerEl.createDiv({
+  const listEl = sectionEl.createDiv({
     cls: "osp-panel-list"
   });
 
