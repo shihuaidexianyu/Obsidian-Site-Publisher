@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -277,6 +277,40 @@ describe("runCli", () => {
     expect(runtime.orchestrator.build).not.toHaveBeenCalled();
     expect(runtime.orchestrator.deployFromBuild).toHaveBeenCalledOnce();
   });
+
+  it("writes a bootstrap log when argument parsing fails", async () => {
+    const cwd = await createTempDirectory();
+    const output = createCapturedOutput();
+
+    const exitCode = await runCli(["scan", "--preview-port"], {
+      cwd,
+      output
+    });
+
+    expect(exitCode).toBe(1);
+    const logContents = await readLatestCliLog(path.join(cwd, ".osp", "logs"));
+
+    expect(logContents).toContain("Missing value for --preview-port.");
+    expect(logContents).toContain("CLI failed before command execution started.");
+  });
+
+  it("writes a bootstrap log when config resolution fails before the main reporter exists", async () => {
+    const cwd = await createTempDirectory();
+    const output = createCapturedOutput();
+
+    await writeFile(path.join(cwd, "publisher.config.json"), "{ not-valid-json", "utf8");
+
+    const exitCode = await runCli(["scan"], {
+      cwd,
+      output
+    });
+
+    expect(exitCode).toBe(1);
+    const logContents = await readLatestCliLog(path.join(cwd, ".osp", "logs"));
+
+    expect(logContents).toContain("CLI failed before the main reporter was initialized.");
+    expect(logContents).toContain("Expected property name or '}' in JSON");
+  });
 });
 
 function createStubRuntime(options: {
@@ -361,4 +395,17 @@ async function createTempDirectory(): Promise<string> {
 
   temporaryDirectories.push(directoryPath);
   return directoryPath;
+}
+
+async function readLatestCliLog(logDirectory: string): Promise<string> {
+  const logFiles = (await readdir(logDirectory))
+    .filter((entry) => entry.endsWith(".log"))
+    .sort();
+  const latestLog = logFiles.at(-1);
+
+  if (latestLog === undefined) {
+    throw new Error(`No log file found in ${logDirectory}`);
+  }
+
+  return readFile(path.join(logDirectory, latestLog), "utf8");
 }
