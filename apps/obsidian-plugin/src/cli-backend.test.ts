@@ -73,6 +73,33 @@ describe("CliPluginBackend", () => {
 
     await backend.dispose();
   });
+
+  it("can preview from an existing build result without triggering a rebuild", async () => {
+    const pluginRoot = await createTempDirectory();
+    const cliEntrypoint = path.join(pluginRoot, "cli.js");
+
+    await writeFile(cliEntrypoint, createFakeCliScript(), "utf8");
+
+    const backend = new CliPluginBackend({
+      cliCommand: cliEntrypoint,
+      logDirectory: path.join(pluginRoot, ".osp", "logs")
+    });
+
+    const preview = await backend.previewBuilt(
+      {
+        success: true,
+        outputDir: path.join(pluginRoot, ".osp", "dist"),
+        manifestPath: path.join(pluginRoot, ".osp", "manifest.json"),
+        issues: [],
+        logs: [],
+        durationMs: 1
+      },
+      createConfig(pluginRoot)
+    );
+
+    expect(preview.session.url).toBe("http://127.0.0.1:43180");
+    await backend.dispose();
+  });
 });
 
 function createConfig(vaultRoot: string): PublisherConfig {
@@ -110,13 +137,16 @@ const configPath = argv[2];
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 
 if (command === "preview") {
+  const buildResultFlagIndex = argv.indexOf("--build-result");
+  const buildResultPath = buildResultFlagIndex === -1 ? undefined : argv[buildResultFlagIndex + 1];
+  const buildResult = buildResultPath === undefined ? undefined : JSON.parse(fs.readFileSync(buildResultPath, "utf8"));
   console.log(JSON.stringify({
     command: "preview",
     success: true,
     logPath: path.join(config.vaultRoot, ".osp", "logs", "preview.log"),
     session: {
       url: "http://127.0.0.1:43180",
-      workspaceRoot: path.join(config.vaultRoot, ".osp", "preview"),
+      workspaceRoot: buildResult?.outputDir ?? path.join(config.vaultRoot, ".osp", "preview"),
       startedAt: new Date().toISOString()
     }
   }));
@@ -158,11 +188,15 @@ if (command === "scan") {
   return;
 }
 
+const buildResultFlagIndex = argv.indexOf("--build-result");
+const buildResultPath = buildResultFlagIndex === -1 ? undefined : argv[buildResultFlagIndex + 1];
+const buildResult = buildResultPath === undefined ? undefined : JSON.parse(fs.readFileSync(buildResultPath, "utf8"));
+
 console.log(JSON.stringify({
   command: "deploy",
   success: true,
   logPath: path.join(config.vaultRoot, ".osp", "logs", "deploy.log"),
-  build: {
+  build: buildResult ?? {
     success: true,
     outputDir: config.outputDir,
     manifestPath: path.join(config.vaultRoot, ".osp", "manifest.json"),
@@ -173,7 +207,7 @@ console.log(JSON.stringify({
   deploy: {
     success: true,
     target: "none",
-    destination: config.outputDir,
+    destination: buildResult?.outputDir ?? config.outputDir,
     message: "Published."
   }
 }));

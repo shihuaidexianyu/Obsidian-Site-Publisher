@@ -22,10 +22,17 @@ export type PluginPublishResult = {
   logPath?: string | undefined;
 };
 
+export type PluginDeployFromBuildResult = {
+  deploy: DeployResult;
+  logPath?: string | undefined;
+};
+
 export type PluginExecutionBackend = {
   scan(config: PublisherConfig): Promise<PluginScanResult>;
   build(config: PublisherConfig): Promise<PluginBuildResult>;
   preview(config: PublisherConfig): Promise<PluginPreviewResult>;
+  previewBuilt(build: BuildResult, config: PublisherConfig): Promise<PluginPreviewResult>;
   publish(config: PublisherConfig): Promise<PluginPublishResult>;
+  deployBuilt(build: BuildResult, config: PublisherConfig): Promise<PluginDeployFromBuildResult>;
   dispose(): Promise<void>;
 };

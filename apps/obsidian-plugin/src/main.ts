@@ -46,6 +46,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
 
     this.settings = loadedSettings;
     this.registerWorkspaceViews();
+    this.registerVaultChangeListeners();
     this.controller = new PluginCommandController(
       this.shell,
       {
@@ -91,6 +92,7 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
 
   public async updateSettings(nextSettings: PublisherPluginSettings): Promise<void> {
     this.settings = nextSettings;
+    this.shell.invalidateReusableBuild();
     await savePluginSettings(this, this.settings);
     this.refreshPluginViews();
   }
@@ -142,6 +144,18 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
     );
     this.registerView(ISSUE_LIST_VIEW_TYPE, (leaf) => new IssueListView(leaf, () => this.shell.getState(), () => this.settings.ui));
     this.registerView(BUILD_LOG_VIEW_TYPE, (leaf) => new BuildLogView(leaf, () => this.shell.getState()));
+  }
+
+  private registerVaultChangeListeners(): void {
+    const invalidate = (): void => {
+      this.shell.invalidateReusableBuild();
+      this.refreshPluginViews();
+    };
+
+    this.registerEvent(this.app.vault.on("modify", invalidate));
+    this.registerEvent(this.app.vault.on("create", invalidate));
+    this.registerEvent(this.app.vault.on("delete", invalidate));
+    this.registerEvent(this.app.vault.on("rename", invalidate));
   }
 
   private async revealPluginView(viewType: string): Promise<void> {

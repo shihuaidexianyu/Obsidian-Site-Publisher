@@ -4,11 +4,13 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  BuildResultSchema,
   CliBuildResultSchema,
   CliDeployResultSchema,
   CliPreviewResultSchema,
   CliScanResultSchema,
   PublisherConfigSchema,
+  type DeployResult,
   type BuildResult,
   type PreviewSession,
   type PublisherConfig
@@ -24,6 +26,7 @@ import {
 import { tryParseCliPayload } from "./cli-json.js";
 import type {
   PluginBuildResult,
+  PluginDeployFromBuildResult,
   PluginExecutionBackend,
   PluginPreviewResult,
   PluginPublishResult,
@@ -72,6 +75,50 @@ export class CliPluginBackend implements PluginExecutionBackend {
   }
 
   public async preview(config: PublisherConfig): Promise<PluginPreviewResult> {
+    return this.startPreviewCommand(config);
+  }
+
+  public async previewBuilt(build: BuildResult, config: PublisherConfig): Promise<PluginPreviewResult> {
+    return this.startPreviewCommand(config, build);
+  }
+
+  public async publish(config: PublisherConfig): Promise<PluginPublishResult> {
+    const payload = await this.runOneShotCommand("deploy", config, CliDeployResultSchema);
+
+    if (payload.deploy === undefined) {
+      return {
+        build: payload.build as BuildResult,
+        logPath: payload.logPath
+      };
+    }
+
+    return {
+      build: payload.build as BuildResult,
+      deploy: payload.deploy as NonNullable<PluginPublishResult["deploy"]>,
+      logPath: payload.logPath
+    };
+  }
+
+  public async deployBuilt(build: BuildResult, config: PublisherConfig): Promise<PluginDeployFromBuildResult> {
+    const payload = await this.runOneShotCommand("deploy", config, CliDeployResultSchema, build);
+
+    return {
+      deploy: normalizeDeployResult(
+        payload.deploy ?? {
+          success: false,
+          target: config.deployTarget,
+          message: "CLI deploy command did not return a deploy result."
+        }
+      ),
+      logPath: payload.logPath
+    };
+  }
+
+  public async dispose(): Promise<void> {
+    await this.stopActivePreview();
+  }
+
+  private async startPreviewCommand(config: PublisherConfig, build: BuildResult | undefined = undefined): Promise<PluginPreviewResult> {
     await this.stopActivePreview();
 
     const cliCommand = this.options.cliCommand;
@@ -80,8 +127,11 @@ export class CliPluginBackend implements PluginExecutionBackend {
     const configPath = path.join(tempDir, "publisher.config.json");
 
     await writeCliConfig(configPath, normalizedConfig);
+    if (build !== undefined) {
+      await writeBuildResult(path.join(tempDir, "build-result.json"), build);
+    }
 
-    const child = createCliChild(this.options.cliCommand, this.createCliArgs("preview", configPath), {
+    const child = createCliChild(this.options.cliCommand, this.createCliArgs("preview", configPath, build), {
       cwd: normalizedConfig.vaultRoot
     });
 
@@ -156,31 +206,11 @@ export class CliPluginBackend implements PluginExecutionBackend {
     }
   }
 
-  public async publish(config: PublisherConfig): Promise<PluginPublishResult> {
-    const payload = await this.runOneShotCommand("deploy", config, CliDeployResultSchema);
-
-    if (payload.deploy === undefined) {
-      return {
-        build: payload.build as BuildResult,
-        logPath: payload.logPath
-      };
-    }
-
-    return {
-      build: payload.build as BuildResult,
-      deploy: payload.deploy as NonNullable<PluginPublishResult["deploy"]>,
-      logPath: payload.logPath
-    };
-  }
-
-  public async dispose(): Promise<void> {
-    await this.stopActivePreview();
-  }
-
   private async runOneShotCommand<TSchema extends z.ZodTypeAny>(
     command: "scan" | "build" | "deploy",
     config: PublisherConfig,
-    schema: TSchema
+    schema: TSchema,
+    build: BuildResult | undefined = undefined
   ): Promise<z.output<TSchema>> {
     const cliCommand = this.options.cliCommand;
     const normalizedConfig = normalizePluginConfig(config);
@@ -188,9 +218,12 @@ export class CliPluginBackend implements PluginExecutionBackend {
     const configPath = path.join(tempDir, "publisher.config.json");
 
     await writeCliConfig(configPath, normalizedConfig);
+    if (build !== undefined) {
+      await writeBuildResult(path.join(tempDir, "build-result.json"), build);
+    }
 
     try {
-      const completed = await runCliProcess(this.options.cliCommand, this.createCliArgs(command, configPath), {
+      const completed = await runCliProcess(this.options.cliCommand, this.createCliArgs(command, configPath, build), {
         cwd: normalizedConfig.vaultRoot
       });
       const payload = tryParseCliPayload(completed.stdout, schema);
@@ -207,12 +240,13 @@ export class CliPluginBackend implements PluginExecutionBackend {
     }
   }
 
-  private createCliArgs(command: "scan" | "build" | "preview" | "deploy", configPath: string): string[] {
+  private createCliArgs(command: "scan" | "build" | "preview" | "deploy", configPath: string, build: BuildResult | undefined): string[] {
     return [
       command,
       "--config",
       configPath,
       "--json",
+      ...(build === undefined ? [] : ["--build-result", path.join(path.dirname(configPath), "build-result.json")]),
       ...(this.options.logDirectory === undefined ? [] : ["--log-dir", this.options.logDirectory]),
       ...(this.options.previewPort === undefined ? [] : ["--preview-port", `${this.options.previewPort}`]),
       ...(this.options.quartzPackageRoot === undefined ? [] : ["--quartz-package-root", this.options.quartzPackageRoot])
@@ -234,6 +268,24 @@ export class CliPluginBackend implements PluginExecutionBackend {
 
 async function writeCliConfig(configPath: string, config: PublisherConfig): Promise<void> {
   await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
+}
+
+async function writeBuildResult(buildResultPath: string, build: BuildResult): Promise<void> {
+  await writeFile(buildResultPath, JSON.stringify(BuildResultSchema.parse(build), null, 2), "utf8");
+}
+
+function normalizeDeployResult(result: {
+  success: boolean;
+  target: DeployResult["target"];
+  message: string;
+  destination?: string | undefined;
+}): DeployResult {
+  return {
+    success: result.success,
+    target: result.target,
+    message: result.message,
+    ...(result.destination === undefined ? {} : { destination: result.destination })
+  };
 }
 async function createCliTempDirectory(tempRoot: string | undefined): Promise<string> {
   const baseDirectory = tempRoot ?? path.join(os.tmpdir(), "osp-plugin-cli-");

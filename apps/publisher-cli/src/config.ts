@@ -11,6 +11,7 @@ export type CliCommand = (typeof supportedCommands)[number];
 export type CliOptions = {
   configPath?: string;
   vaultRoot?: string;
+  buildResultPath?: string;
   json: boolean;
   logDir?: string;
   previewPort?: number;
@@ -85,6 +86,18 @@ export function parseCliArguments(argv: string[]): ParsedCliArguments {
       }
 
       options.vaultRoot = value;
+      index += 1;
+      continue;
+    }
+
+    if (token === "--build-result") {
+      const value = rest[index + 1];
+
+      if (value === undefined) {
+        return { kind: "error", message: "Missing value for --build-result." };
+      }
+
+      options.buildResultPath = value;
       index += 1;
       continue;
     }

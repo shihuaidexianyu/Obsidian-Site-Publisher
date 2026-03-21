@@ -66,6 +66,12 @@ const maxStoredLogEntries = 40;
 export class PublisherPluginShell {
   private state: PluginExecutionState = defaultState;
   private activePreviewBackend: PluginExecutionBackend | undefined;
+  private reusableBuild:
+    | {
+        configKey: string;
+        build: BuildResult;
+      }
+    | undefined;
 
   public constructor(private readonly createBackend: () => PluginExecutionBackend = createUnavailableBackend) {}
 
@@ -125,6 +131,10 @@ export class PublisherPluginShell {
     return true;
   }
 
+  public invalidateReusableBuild(): void {
+    this.reusableBuild = undefined;
+  }
+
   public async runCommand(command: PluginCommand, config: PublisherConfig): Promise<PluginCommandResult> {
     switch (command) {
       case "issues":
@@ -166,6 +176,7 @@ export class PublisherPluginShell {
     const build = await backend.build(config);
     const result = build.result;
     const statusMessage = result.success ? "站点构建完成。" : "站点构建失败，请检查问题和日志。";
+    this.captureReusableBuild(config, result);
 
     this.updateState({
       lastCommand: "build",
@@ -187,11 +198,12 @@ export class PublisherPluginShell {
 
   private async runPreviewCommand(config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "preview" }>> {
     await this.stopActivePreview();
+    const reusableBuild = this.getReusableBuild(config);
 
     const backend = this.createBackend();
 
     try {
-      const preview = await backend.preview(config);
+      const preview = reusableBuild === undefined ? await backend.preview(config) : await backend.previewBuilt(reusableBuild, config);
       const session = preview.session;
       const statusMessage = `站点预览已启动：${session.url}`;
 
@@ -200,9 +212,9 @@ export class PublisherPluginShell {
         lastCommand: "preview",
         statusMessage,
         lastLogPath: preview.logPath,
-        lastIssues: this.state.lastIssues,
+        lastIssues: reusableBuild?.issues ?? this.state.lastIssues,
         lastLogs: [],
-        lastBuildResult: undefined,
+        lastBuildResult: reusableBuild ?? this.state.lastBuildResult,
         lastPreviewSession: session,
         lastDeployResult: undefined
       });
@@ -219,8 +231,34 @@ export class PublisherPluginShell {
   }
 
   private async runPublishCommand(backend: PluginExecutionBackend, config: PublisherConfig): Promise<Extract<PluginCommandResult, { command: "publish" }>> {
+    const reusableBuild = this.getReusableBuild(config);
+
+    if (reusableBuild !== undefined) {
+      const reusedDeploy = await backend.deployBuilt(reusableBuild, config);
+      const statusMessage = reusedDeploy.deploy.success ? "站点发布成功。" : "构建成功，但发布失败。";
+
+      this.updateState({
+        lastCommand: "publish",
+        statusMessage,
+        lastLogPath: reusedDeploy.logPath,
+        lastIssues: reusableBuild.issues,
+        lastLogs: retainRecentLogs(reusableBuild.logs),
+        lastBuildResult: reusableBuild,
+        lastPreviewSession: undefined,
+        lastDeployResult: reusedDeploy.deploy
+      });
+
+      return {
+        command: "publish",
+        build: reusableBuild,
+        deploy: reusedDeploy.deploy,
+        statusMessage
+      };
+    }
+
     const publishResult = await backend.publish(config);
     const { build, deploy } = publishResult;
+    this.captureReusableBuild(config, build);
 
     if (!build.success) {
       const statusMessage = "发布已停止，因为构建没有成功。";
@@ -297,6 +335,26 @@ export class PublisherPluginShell {
     await this.activePreviewBackend.dispose();
     this.activePreviewBackend = undefined;
   }
+
+  private getReusableBuild(config: PublisherConfig): BuildResult | undefined {
+    if (this.reusableBuild?.configKey !== createConfigKey(config)) {
+      return undefined;
+    }
+
+    return this.reusableBuild.build.success ? this.reusableBuild.build : undefined;
+  }
+
+  private captureReusableBuild(config: PublisherConfig, build: BuildResult): void {
+    if (!build.success || build.outputDir === undefined) {
+      this.reusableBuild = undefined;
+      return;
+    }
+
+    this.reusableBuild = {
+      configKey: createConfigKey(config),
+      build
+    };
+  }
 }
 
 function retainRecentLogs(logs: BuildLogEntry[]): BuildLogEntry[] {
@@ -316,7 +374,13 @@ function createUnavailableBackend(): PluginExecutionBackend {
     async preview() {
       throw createError();
     },
+    async previewBuilt() {
+      throw createError();
+    },
     async publish(): Promise<PluginPublishResult> {
+      throw createError();
+    },
+    async deployBuilt(): Promise<import("./plugin-backend.js").PluginDeployFromBuildResult> {
       throw createError();
     },
     async dispose(): Promise<void> {}
@@ -337,4 +401,8 @@ function createIssuesStatusMessage(issueCount: number): string {
   }
 
   return `发现 ${issueCount} 个发布问题。`;
+}
+
+function createConfigKey(config: PublisherConfig): string {
+  return JSON.stringify(config);
 }

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -150,6 +150,31 @@ describe("runCli", () => {
     expect(output.logs.join("\n")).toContain("Preview ready at http://localhost:8080");
   });
 
+  it("reuses an existing build for preview when --build-result is provided", async () => {
+    const cwd = await createTempDirectory();
+    const output = createCapturedOutput();
+    const runtime = createStubRuntime();
+    const waitForPreviewShutdown = vi.fn(async () => {});
+    const buildResultPath = path.join(cwd, "build-result.json");
+    const outputDir = path.join(cwd, "dist");
+
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(path.join(outputDir, "index.html"), "<html><body>Preview</body></html>", "utf8");
+    await writeFile(buildResultPath, JSON.stringify(createBuildResult({ outputDir }), null, 2), "utf8");
+
+    const exitCode = await runCli(["preview", "--vault-root", "./vault", "--build-result", buildResultPath], {
+      cwd,
+      output,
+      createRuntime: () => runtime,
+      waitForPreviewShutdown
+    });
+
+    expect(exitCode).toBe(0);
+    expect(runtime.orchestrator.preview).not.toHaveBeenCalled();
+    expect(waitForPreviewShutdown).toHaveBeenCalledOnce();
+    expect(output.logs.join("\n")).toContain("Preview ready at http://127.0.0.1:8080");
+  });
+
   it("prints machine-readable JSON when --json is used", async () => {
     const output = createCapturedOutput();
     const runtime = createStubRuntime();
@@ -233,6 +258,25 @@ describe("runCli", () => {
       preferStaticPreview: true
     });
   });
+
+  it("deploys from an existing build when --build-result is provided", async () => {
+    const cwd = await createTempDirectory();
+    const output = createCapturedOutput();
+    const runtime = createStubRuntime();
+    const buildResultPath = path.join(cwd, "build-result.json");
+
+    await writeFile(buildResultPath, JSON.stringify(createBuildResult({ outputDir: path.join(cwd, "dist") }), null, 2), "utf8");
+
+    const exitCode = await runCli(["deploy", "--vault-root", "./vault", "--build-result", buildResultPath], {
+      cwd,
+      output,
+      createRuntime: () => runtime
+    });
+
+    expect(exitCode).toBe(0);
+    expect(runtime.orchestrator.build).not.toHaveBeenCalled();
+    expect(runtime.orchestrator.deployFromBuild).toHaveBeenCalledOnce();
+  });
 });
 
 function createStubRuntime(options: {
@@ -277,7 +321,7 @@ function createManifest(vaultRoot: string): VaultManifest {
   };
 }
 
-function createBuildResult(): BuildResult {
+function createBuildResult(overrides: Partial<BuildResult> = {}): BuildResult {
   return {
     success: true,
     outputDir: "/workspace/dist",
@@ -290,7 +334,8 @@ function createBuildResult(): BuildResult {
         timestamp: "2026-03-18T11:11:13.000Z"
       }
     ],
-    durationMs: 12
+    durationMs: 12,
+    ...overrides
   };
 }
 

@@ -139,7 +139,9 @@ function createBackend(): PluginExecutionBackend {
     scan: vi.fn(),
     build: vi.fn(),
     preview: vi.fn(),
+    previewBuilt: vi.fn(),
     publish: vi.fn(),
+    deployBuilt: vi.fn(),
     dispose: vi.fn(async () => {})
   };
 }

@@ -1,8 +1,10 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { createDefaultPublisherRuntime } from "@osp/core";
 import type { PublisherOrchestrator } from "@osp/core";
-import type { BuildIssue, BuildLogEntry, BuildResult, CliJsonResult, DeployResult, PreviewSession, PublisherConfig } from "@osp/shared";
+import { BuildResultSchema, type BuildIssue, type BuildLogEntry, type BuildResult, type CliJsonResult, type DeployResult, type PreviewSession, type PublisherConfig } from "@osp/shared";
+import { startStaticPreviewServer } from "./static-preview-server.js";
 
 import { createCliLogger, type CliLogger } from "./cli-logging.js";
 import { parseCliArguments, resolveCliConfig, supportedCommands } from "./config.js";
@@ -59,6 +61,10 @@ export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<
 
   try {
     const resolvedConfig = await resolveCliConfig(parsedArguments.options, cwd);
+    const resolvedBuild =
+      parsedArguments.options.buildResultPath === undefined
+        ? undefined
+        : await readBuildResult(path.resolve(cwd, parsedArguments.options.buildResultPath));
     const bundledNodeExecutablePath = resolveBundledNodeExecutablePath();
     const builderOptions = {
       ...(bundledNodeExecutablePath === undefined ? {} : { nodeExecutablePath: bundledNodeExecutablePath }),
@@ -102,9 +108,16 @@ export async function runCli(argv: string[], runtime: CliRuntime = {}): Promise<
       case "build":
         return await runBuildCommand(cliRuntime.orchestrator, resolvedConfig.config, reporter);
       case "preview":
-        return await runPreviewCommand(cliRuntime, resolvedConfig.config, reporter, runtime.waitForPreviewShutdown);
+        return await runPreviewCommand(
+          cliRuntime,
+          resolvedConfig.config,
+          reporter,
+          runtime.waitForPreviewShutdown,
+          parsedArguments.options.previewPort,
+          resolvedBuild
+        );
       case "deploy":
-        return await runDeployCommand(cliRuntime.orchestrator, resolvedConfig.config, reporter);
+        return await runDeployCommand(cliRuntime.orchestrator, resolvedConfig.config, reporter, resolvedBuild);
     }
 
     return 1;
@@ -175,8 +188,14 @@ async function runPreviewCommand(
   runtime: CliSession,
   config: PublisherConfig,
   reporter: CliReporter,
-  waitForPreviewShutdown: (() => Promise<void>) | undefined
+  waitForPreviewShutdown: (() => Promise<void>) | undefined,
+  previewPort: number | undefined,
+  build: BuildResult | undefined
 ): Promise<number> {
+  if (build !== undefined) {
+    return runPreviewFromBuild(build, reporter, waitForPreviewShutdown, previewPort);
+  }
+
   const session = await runtime.orchestrator.preview(config);
 
   if (reporter.json) {
@@ -195,8 +214,13 @@ async function runPreviewCommand(
   return 0;
 }
 
-async function runDeployCommand(orchestrator: CliOrchestrator, config: PublisherConfig, reporter: CliReporter): Promise<number> {
-  const build = await orchestrator.build(config);
+async function runDeployCommand(
+  orchestrator: CliOrchestrator,
+  config: PublisherConfig,
+  reporter: CliReporter,
+  existingBuild: BuildResult | undefined
+): Promise<number> {
+  const build = existingBuild ?? (await orchestrator.build(config));
 
   writeBuildLogsToLogger(reporter, build.logs);
 
@@ -231,6 +255,54 @@ async function runDeployCommand(orchestrator: CliOrchestrator, config: Publisher
   printBuildResult(reporter, build);
   printDeployResult(reporter, deploy);
   return deploy.success ? 0 : 1;
+}
+
+async function runPreviewFromBuild(
+  build: BuildResult,
+  reporter: CliReporter,
+  waitForPreviewShutdown: (() => Promise<void>) | undefined,
+  previewPort: number | undefined
+): Promise<number> {
+  if (!build.success || build.outputDir === undefined) {
+    throw new Error("Cannot preview from an unavailable build result.");
+  }
+
+  const port = previewPort ?? 8080;
+  const server = await startStaticPreviewServer(build.outputDir, port);
+  const session: PreviewSession = {
+    url: `http://127.0.0.1:${port}`,
+    workspaceRoot: build.outputDir,
+    startedAt: new Date().toISOString()
+  };
+
+  try {
+    if (reporter.json) {
+      printJson(reporter, {
+        command: "preview",
+        success: true,
+        logPath: reporter.logger.logPath,
+        session
+      });
+    } else {
+      printPreviewSession(reporter, session);
+    }
+
+    reporter.logger.info(`Preview reused existing build output at ${build.outputDir}`);
+    reporter.logger.info(`Preview active at ${session.url}`);
+    await (waitForPreviewShutdown ?? waitForTerminationSignal)();
+    return 0;
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error !== undefined) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
 }
 
 function printBuildResult(reporter: CliReporter, result: BuildResult): void {
@@ -327,6 +399,11 @@ function createHelpText(): string {
     "  publisher-cli preview --vault-root ./my-vault --preview-port 8080",
     "  publisher-cli deploy --config ./publisher.config.json"
   ].join("\n");
+}
+
+async function readBuildResult(buildResultPath: string): Promise<BuildResult> {
+  const fileContents = await readFile(buildResultPath, "utf8");
+  return BuildResultSchema.parse(JSON.parse(fileContents)) as BuildResult;
 }
 
 function formatError(error: unknown): string {

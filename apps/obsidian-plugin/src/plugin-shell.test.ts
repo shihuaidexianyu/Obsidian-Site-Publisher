@@ -115,6 +115,28 @@ describe("PublisherPluginShell", () => {
     expect(backend.dispose).not.toHaveBeenCalled();
   });
 
+  it("reuses the last successful build for preview", async () => {
+    const buildBackend = createBackend({
+      buildResult: {
+        logPath: "/vault/.osp/logs/build.log",
+        result: createBuildResult()
+      }
+    });
+    const previewBackend = createBackend({
+      previewResult: {
+        logPath: "/vault/.osp/logs/preview.log",
+        session: createPreviewSession()
+      }
+    });
+    const plugin = new PublisherPluginShell(vi.fn().mockReturnValueOnce(buildBackend).mockReturnValueOnce(previewBackend));
+
+    await plugin.runCommand("build", createConfig("/vault"));
+    await plugin.runCommand("preview", createConfig("/vault"));
+
+    expect(previewBackend.previewBuilt).toHaveBeenCalledOnce();
+    expect(previewBackend.preview).not.toHaveBeenCalled();
+  });
+
   it("stops the previous preview before starting a new one", async () => {
     const firstBackend = createBackend({
       previewResult: {
@@ -192,6 +214,24 @@ describe("PublisherPluginShell", () => {
     });
   });
 
+  it("reuses the last successful build for publish deployment", async () => {
+    const buildBackend = createBackend({
+      buildResult: {
+        logPath: "/vault/.osp/logs/build.log",
+        result: createBuildResult()
+      }
+    });
+    const deployBackend = createBackend();
+    const plugin = new PublisherPluginShell(vi.fn().mockReturnValueOnce(buildBackend).mockReturnValueOnce(deployBackend));
+
+    await plugin.runCommand("build", createConfig("/vault"));
+    const result = await plugin.runCommand("publish", createConfig("/vault"));
+
+    expect(result.command).toBe("publish");
+    expect(deployBackend.deployBuilt).toHaveBeenCalledOnce();
+    expect(deployBackend.publish).not.toHaveBeenCalled();
+  });
+
   it("does not deploy when publish build fails", async () => {
     const backend = createBackend({
       publishResult: {
@@ -221,10 +261,15 @@ function createBackend(options: {
     scan: vi.fn(async () => options.scanResult ?? { manifest: createManifest("/vault"), issues: [] }),
     build: vi.fn(async () => options.buildResult ?? { result: createBuildResult() }),
     preview: vi.fn(async () => options.previewResult ?? { session: createPreviewSession() }),
+    previewBuilt: vi.fn(async () => options.previewResult ?? { session: createPreviewSession() }),
     publish: vi.fn(async () => options.publishResult ?? {
       build: createBuildResult(),
       deploy: createDeployResult()
     }),
+    deployBuilt: vi.fn(async () => ({
+      deploy: createDeployResult(),
+      logPath: "/vault/.osp/logs/deploy.log"
+    })),
     dispose: vi.fn(async () => {})
   };
 }
