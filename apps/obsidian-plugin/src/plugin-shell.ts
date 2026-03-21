@@ -110,6 +110,21 @@ export class PublisherPluginShell {
     await this.stopActivePreview();
   }
 
+  public async stopPreview(): Promise<boolean> {
+    if (this.activePreviewBackend === undefined) {
+      return false;
+    }
+
+    await this.stopActivePreview();
+    this.updateState({
+      lastCommand: "preview",
+      statusMessage: "预览已停止。",
+      lastPreviewSession: undefined,
+      lastLogs: []
+    });
+    return true;
+  }
+
   public async runCommand(command: PluginCommand, config: PublisherConfig): Promise<PluginCommandResult> {
     switch (command) {
       case "issues":

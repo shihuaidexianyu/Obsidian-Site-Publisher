@@ -154,7 +154,7 @@ describe("plugin view model", () => {
       {
         command: "preview",
         label: "启动预览",
-        description: "启动本地预览服务，便于先检查效果。",
+        description: "启动本地预览服务，并自动打开浏览器。",
         buttonLabel: "启动预览",
         isRunning: false,
         isDisabled: true

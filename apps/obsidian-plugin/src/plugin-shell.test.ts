@@ -153,6 +153,21 @@ describe("PublisherPluginShell", () => {
     expect(backend.dispose).toHaveBeenCalledOnce();
   });
 
+  it("can stop an active preview and clear the session state", async () => {
+    const backend = createBackend();
+    const plugin = new PublisherPluginShell(() => backend);
+
+    await plugin.runCommand("preview", createConfig("/vault"));
+
+    await expect(plugin.stopPreview()).resolves.toBe(true);
+    expect(backend.dispose).toHaveBeenCalledOnce();
+    expect(plugin.getState()).toMatchObject({
+      lastCommand: "preview",
+      lastPreviewSession: undefined,
+      statusMessage: "预览已停止。"
+    });
+  });
+
   it("runs publish as build plus deploy and stores the deploy result", async () => {
     const backend = createBackend({
       publishResult: {

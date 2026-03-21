@@ -58,6 +58,13 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
         },
         setStatus: () => {},
         beginProgress: () => () => {},
+        openUrl: (url) => {
+          const openUrl = (globalThis as {
+            open?: (href: string, target?: string, features?: string) => unknown;
+          }).open;
+
+          openUrl?.(url, "_blank", "noopener,noreferrer");
+        },
         showNotice: (message) => {
           new Notice(message);
         },
@@ -114,6 +121,22 @@ export default class ObsidianSitePublisherPlugin extends Plugin {
             }
 
             await this.controller.runCommand(command);
+          },
+          async () => {
+            if (this.controller?.getActiveCommand() !== undefined) {
+              new Notice("当前已有任务正在运行，请等待后再停止预览。");
+              return;
+            }
+
+            const stopped = await this.shell.stopPreview();
+
+            if (!stopped) {
+              new Notice("当前没有正在运行的预览。");
+              return;
+            }
+
+            new Notice("预览已停止。");
+            this.refreshPluginViews();
           }
         )
     );

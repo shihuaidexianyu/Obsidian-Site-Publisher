@@ -6,6 +6,7 @@ export type PluginHost = {
   registerCommand(definition: PluginCommandDefinition, callback: () => Promise<void>): void;
   setStatus(message: string): void;
   beginProgress(command: PluginCommand): () => void;
+  openUrl(url: string): void;
   showNotice(message: string): void;
   revealIssueListView(): Promise<void>;
   revealBuildLogView(): Promise<void>;
@@ -53,6 +54,9 @@ export class PluginCommandController {
 
       stopProgress();
       this.host.setStatus(createStatusBarMessage(result));
+      if (result.command === "preview") {
+        this.host.openUrl(result.session.url);
+      }
       this.host.showNotice(result.statusMessage);
     } catch (error) {
       const message = formatPluginCommandError(command, error);

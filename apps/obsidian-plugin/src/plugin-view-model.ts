@@ -119,7 +119,7 @@ export function createControlPanelActions(activeCommand: PluginCommand | undefin
   return [
     createControlPanelAction("issues", "检查问题", "扫描当前配置下的阻断项和提示。", activeCommand),
     createControlPanelAction("build", "构建站点", "生成静态站点文件，但不执行发布。", activeCommand),
-    createControlPanelAction("preview", "启动预览", "启动本地预览服务，便于先检查效果。", activeCommand),
+    createControlPanelAction("preview", "启动预览", "启动本地预览服务，并自动打开浏览器。", activeCommand),
     createControlPanelAction("publish", "发布站点", "按当前发布目标执行构建并发布。", activeCommand)
   ];
 }

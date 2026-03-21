@@ -102,6 +102,11 @@
   line-height: 1.4;
 }
 
+.osp-status-card-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .osp-section {
   display: flex;
   flex-direction: column;
@@ -163,6 +168,12 @@
   width: 100%;
   justify-content: center;
   min-height: 34px;
+  font-weight: 600;
+}
+
+.osp-secondary-button {
+  min-height: 32px;
+  padding: 0 12px;
   font-weight: 600;
 }
 

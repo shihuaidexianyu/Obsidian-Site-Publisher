@@ -25,13 +25,15 @@ type StateReader = () => PluginExecutionState;
 type UiSettingsReader = () => PublisherPluginUiSettings;
 type ActiveCommandReader = () => PluginCommand | undefined;
 type CommandRunner = (command: PluginCommand) => Promise<void>;
+type PreviewStopper = () => Promise<void>;
 
 export class PublisherControlView extends ItemView {
   public constructor(
     leaf: WorkspaceLeaf,
     private readonly readState: StateReader,
     private readonly readActiveCommand: ActiveCommandReader,
-    private readonly runCommand: CommandRunner
+    private readonly runCommand: CommandRunner,
+    private readonly stopPreview: PreviewStopper
   ) {
     super(leaf);
   }
@@ -57,7 +59,7 @@ export class PublisherControlView extends ItemView {
   }
 
   public refresh(): void {
-    renderControlPanel(this.contentEl, this.readState(), this.readActiveCommand(), this.runCommand);
+    renderControlPanel(this.contentEl, this.readState(), this.readActiveCommand(), this.runCommand, this.stopPreview);
   }
 }
 
@@ -117,7 +119,8 @@ function renderControlPanel(
   containerEl: HTMLElement,
   state: PluginExecutionState,
   activeCommand: PluginCommand | undefined,
-  runCommand: CommandRunner
+  runCommand: CommandRunner,
+  stopPreview: PreviewStopper
 ): void {
   const meta = createControlPanelMeta(state, activeCommand);
   const actions = createControlPanelActions(activeCommand);
@@ -161,6 +164,18 @@ function renderControlPanel(
     statusCardEl.createEl("div", {
       cls: "osp-progress-text",
       text: meta.progressMessage
+    });
+  }
+  if (state.lastPreviewSession !== undefined && activeCommand === undefined) {
+    const statusActionsEl = statusCardEl.createDiv({
+      cls: "osp-status-card-actions"
+    });
+    const stopPreviewButtonEl = statusActionsEl.createEl("button", {
+      cls: "osp-secondary-button",
+      text: "停止预览"
+    });
+    stopPreviewButtonEl.addEventListener("click", () => {
+      void stopPreview();
     });
   }
 

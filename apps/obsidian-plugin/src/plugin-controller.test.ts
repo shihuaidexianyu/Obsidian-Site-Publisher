@@ -27,6 +27,7 @@ describe("PluginCommandController", () => {
     expect(shell.runCommand).toHaveBeenCalledWith("preview", createConfig("/vault"));
     expect(host.beginProgress).toHaveBeenCalledWith("preview");
     expect(host.setStatus).toHaveBeenCalledWith("站点发布：预览已启动");
+    expect(host.openUrl).toHaveBeenCalledWith("http://localhost:8080");
     expect(host.showNotice).toHaveBeenCalledWith("站点预览已启动：http://localhost:8080");
     expect(host.refreshViews).toHaveBeenCalledTimes(2);
   });
@@ -60,6 +61,7 @@ describe("PluginCommandController", () => {
 
     await controller.runCommand("build");
 
+    expect(host.openUrl).not.toHaveBeenCalled();
     expect(host.revealIssueListView).not.toHaveBeenCalled();
     expect(host.revealBuildLogView).not.toHaveBeenCalled();
     expect(host.refreshViews).toHaveBeenCalledTimes(2);
@@ -124,6 +126,7 @@ function createHost() {
     registerCommand: vi.fn(),
     setStatus: vi.fn(),
     beginProgress: vi.fn(() => vi.fn()),
+    openUrl: vi.fn(),
     showNotice: vi.fn(),
     revealIssueListView: vi.fn(async () => {}),
     revealBuildLogView: vi.fn(async () => {}),
